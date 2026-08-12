@@ -1,0 +1,537 @@
+/* Raupp ERP Corporate Design Tokens */
+:root {
+  --bg-main: #0a0c10;
+  --card-bg: rgba(18, 22, 30, 0.75);
+  --card-glass: rgba(18, 22, 30, 0.85);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-color-glow: rgba(0, 162, 232, 0.3);
+  --text-primary: #f3f4f6;
+  --text-secondary: #9ca3af;
+  
+  /* Cores Corporativas Raupp */
+  --raupp-blue-light: #00a2e8;
+  --raupp-blue-dark: #0c5ba6;
+  --raupp-orange: #f28123;
+  --raupp-dark-gray: #333333;
+  
+  /* Cores de feedback */
+  --error: #ef4444;
+  --error-bg: rgba(239, 68, 68, 0.15);
+  --success: #10b981;
+  --success-bg: rgba(16, 185, 129, 0.15);
+  --warning: #f59e0b;
+  
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--raupp-blue-light);
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  padding-bottom: 85px;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Elementos de Fundo Decorativos Corporativos Raupp */
+.bg-decor {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(120px);
+  z-index: 0;
+  opacity: 0.35;
+  pointer-events: none;
+  animation: pulseRaupp 10s infinite alternate ease-in-out;
+}
+
+.bg-decor-1 {
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, var(--raupp-blue-dark) 0%, transparent 70%);
+  top: -10%;
+  left: -10%;
+}
+
+.bg-decor-2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, var(--raupp-orange) 0%, transparent 70%);
+  bottom: -15%;
+  right: -10%;
+  animation-delay: -5s;
+}
+
+@keyframes pulseRaupp {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(30px, -30px) scale(1.15); }
+}
+
+/* App Wrapper */
+.app-container {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+}
+
+/* Header Corporativo Raupp */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(10, 12, 16, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-color);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.header-title-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-wrapper {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 6px 12px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.logo-img {
+  height: 32px;
+  object-fit: contain;
+  display: block;
+}
+
+.header-app-name {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.header-tech-badge {
+  font-size: 0.72rem;
+  background: rgba(0, 162, 232, 0.15);
+  color: var(--raupp-blue-light);
+  border: 1px solid rgba(0, 162, 232, 0.35);
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.status-dot-live {
+  width: 7px;
+  height: 7px;
+  background-color: var(--raupp-blue-light);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--raupp-blue-light);
+  animation: pulseLive 2s infinite;
+}
+
+@keyframes pulseLive {
+  0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 162, 232, 0.8); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(0, 162, 232, 0); }
+  100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 162, 232, 0); }
+}
+
+/* Tab Navigation Bar Raupp Style */
+.tab-navigation {
+  display: flex;
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  margin: 16px;
+  border-radius: 14px;
+  padding: 5px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.tab-button {
+  flex: 1;
+  padding: 11px 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: inherit;
+}
+
+.tab-button.active {
+  background: linear-gradient(135deg, var(--raupp-blue-dark), var(--raupp-blue-light));
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(0, 162, 232, 0.35);
+}
+
+.tab-count-chip {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.15);
+  font-weight: 700;
+}
+
+/* Card Chamado (OS) Raupp Style */
+.os-card {
+  background: var(--card-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  margin: 14px 16px;
+  padding: 18px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  transition: var(--transition-smooth);
+  position: relative;
+  overflow: hidden;
+}
+
+.os-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--raupp-blue-dark), var(--raupp-blue-light), var(--raupp-orange));
+}
+
+.os-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  border-color: var(--border-color-glow);
+}
+
+.os-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.os-tag {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--raupp-blue-light);
+  letter-spacing: 0.05em;
+  background: rgba(0, 162, 232, 0.1);
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 162, 232, 0.2);
+}
+
+.badge-prio {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.prio-urgente { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); box-shadow: 0 0 12px rgba(239, 68, 68, 0.2); }
+.prio-alta { background: rgba(242, 129, 35, 0.2); color: var(--raupp-orange); border: 1px solid rgba(242, 129, 35, 0.4); box-shadow: 0 0 12px rgba(242, 129, 35, 0.2); }
+.prio-normal { background: rgba(0, 162, 232, 0.2); color: var(--raupp-blue-light); border: 1px solid rgba(0, 162, 232, 0.4); }
+.prio-baixa { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid rgba(203, 213, 225, 0.4); }
+
+.client-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 10px;
+  line-height: 1.3;
+}
+
+.card-detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.card-detail-row i {
+  color: var(--raupp-blue-light);
+  margin-top: 3px;
+  font-size: 0.95rem;
+}
+
+.equipment-chip-box {
+  background: rgba(10, 12, 16, 0.6);
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  border-radius: 12px;
+  margin-top: 6px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.equipment-chip {
+  background: rgba(0, 162, 232, 0.15);
+  border: 1px solid rgba(0, 162, 232, 0.3);
+  color: var(--raupp-blue-light);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.problem-box {
+  background: rgba(10, 12, 16, 0.7);
+  padding: 12px 14px;
+  border-radius: 12px;
+  margin-top: 12px;
+  font-size: 0.88rem;
+  border-left: 4px solid var(--raupp-blue-light);
+}
+
+.laudo-box {
+  background: rgba(16, 185, 129, 0.12);
+  padding: 12px 14px;
+  border-radius: 12px;
+  margin-top: 12px;
+  font-size: 0.88rem;
+  border-left: 4px solid var(--success);
+}
+
+.actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-color);
+}
+
+.btn-mobile {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  color: #fff;
+  font-family: inherit;
+  transition: var(--transition-smooth);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+.btn-mobile:active {
+  transform: scale(0.96);
+}
+
+.btn-maps { background: linear-gradient(135deg, var(--raupp-blue-dark), var(--raupp-blue-light)); color: #fff; box-shadow: 0 4px 14px rgba(0, 162, 232, 0.3); }
+.btn-call { background: linear-gradient(135deg, #1f2937, #374151); color: #fff; border: 1px solid var(--border-color); }
+.btn-wats { background: linear-gradient(135deg, #15803d, #22c55e); color: #fff; box-shadow: 0 4px 14px rgba(34, 197, 94, 0.3); }
+.btn-start { background: linear-gradient(135deg, var(--raupp-blue-dark), var(--raupp-blue-light)); grid-column: span 2; font-size: 0.95rem; }
+.btn-complete { background: linear-gradient(135deg, var(--raupp-orange), #d97706); grid-column: span 2; font-size: 0.95rem; box-shadow: 0 4px 16px rgba(242, 129, 35, 0.35); }
+
+/* Modais Raupp Style */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(10, 12, 16, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-card {
+  background: var(--card-glass);
+  border: 1px solid var(--border-color-glow);
+  border-radius: 24px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 26px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+  animation: modalScale 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalScale {
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.modal-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modal-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-close-icon {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-smooth);
+}
+
+.modal-close-icon:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.form-group-field {
+  margin-bottom: 16px;
+}
+
+.form-label-styled {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.input-styled {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: rgba(10, 12, 16, 0.85);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 0.92rem;
+  transition: var(--transition-smooth);
+}
+
+.input-styled:focus {
+  outline: none;
+  border-color: var(--raupp-blue-light);
+  box-shadow: 0 0 0 3px rgba(0, 162, 232, 0.25);
+}
+
+/* Canvas de Assinatura Raupp Style */
+.signature-box {
+  border: 2px dashed rgba(0, 162, 232, 0.4);
+  border-radius: 14px;
+  background: #ffffff;
+  position: relative;
+  touch-action: none;
+  margin-top: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.signature-canvas-element {
+  width: 100%;
+  height: 170px;
+  display: block;
+  cursor: crosshair;
+}
+
+/* Toast */
+.toast-floating {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  left: 16px;
+  z-index: 300;
+  padding: 14px 18px;
+  border-radius: 14px;
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5);
+  animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toast-success { background: linear-gradient(135deg, #059669, #10b981); border: 1px solid #34d399; }
+.toast-error { background: linear-gradient(135deg, #ef4444, #dc2626); border: 1px solid #f87171; }
+.toast-warning { background: linear-gradient(135deg, var(--raupp-orange), #d97706); border: 1px solid #fbbf24; }
+
+@keyframes slideDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
