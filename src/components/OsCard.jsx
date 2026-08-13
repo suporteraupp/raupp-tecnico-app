@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal }) {
+export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpenHistory }) {
   const [expanded, setExpanded] = useState(currentTab === 'em_atendimento');
 
   const parceiro = os.parceiro || {};
@@ -129,16 +129,42 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal }) {
             </div>
           )}
 
-          <div className="equipment-chip-box">
-            <i className="fa-solid fa-print" style={{ color: '#60a5fa' }}></i>
-            <div>
-              <span className="equipment-chip">{equipLabel}</span>
-              {equip.numero_serie && (
-                <span style={{ fontSize: '0.8rem', color: '#94a3b8', marginLeft: '8px' }}>
-                  Série: <strong style={{ color: '#f1f5f9' }}>{equip.numero_serie}</strong>
-                </span>
-              )}
+          <div className="equipment-chip-box" style={{ justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <i className="fa-solid fa-print" style={{ color: '#60a5fa' }}></i>
+              <div>
+                <span className="equipment-chip">{equipLabel}</span>
+                {equip.numero_serie && (
+                  <span style={{ fontSize: '0.8rem', color: '#94a3b8', marginLeft: '8px' }}>
+                    Série: <strong style={{ color: '#f1f5f9' }}>{equip.numero_serie}</strong>
+                  </span>
+                )}
+              </div>
             </div>
+
+            {onOpenHistory && (os.equipamentos_id || equip.id_equipamentos) && (
+              <button
+                type="button"
+                onClick={() => onOpenHistory(os.equipamentos_id || equip.id_equipamentos, equipLabel, equip.numero_serie)}
+                style={{
+                  background: 'rgba(56, 189, 248, 0.12)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  color: '#38bdf8',
+                  padding: '4px 9px',
+                  borderRadius: '10px',
+                  fontSize: '0.74rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  whiteSpace: 'nowrap'
+                }}
+                title="Ver Histórico de Manutenções deste Equipamento"
+              >
+                <i className="fa-solid fa-clock-rotate-left"></i> Histórico
+              </button>
+            )}
           </div>
 
           {os.solicitante_nome && (

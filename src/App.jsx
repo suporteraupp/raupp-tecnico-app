@@ -7,6 +7,7 @@ import { OsCard } from './components/OsCard';
 import { ClientList } from './components/ClientList';
 import { CityFilter } from './components/CityFilter';
 import { SignatureModal } from './components/SignatureModal';
+import { EquipmentHistoryModal } from './components/EquipmentHistoryModal';
 import { Toast } from './components/Toast';
 
 export function App() {
@@ -18,7 +19,12 @@ export function App() {
   const [loading, setLoading] = useState(true);
   const [loadingParceiros, setLoadingParceiros] = useState(false);
   const [activeOsForSignature, setActiveOsForSignature] = useState(null);
+  const [historyModalData, setHistoryModalData] = useState(null);
   const [toast, setToast] = useState({ message: '', type: 'info' });
+
+  const handleOpenHistory = (equipamentoId, equipamentoLabel, numeroSerie) => {
+    setHistoryModalData({ equipamentoId, equipamentoLabel, numeroSerie });
+  };
 
   const showToast = (message, type = 'info') => {
     setToast({ message, type });
@@ -200,6 +206,7 @@ export function App() {
               currentTab={currentTab}
               onStartOs={handleStartOs}
               onOpenSignatureModal={setActiveOsForSignature}
+              onOpenHistory={handleOpenHistory}
             />
           ))
         )}
@@ -211,6 +218,15 @@ export function App() {
           onClose={() => setActiveOsForSignature(null)}
           onSubmit={handleCompleteOsSubmit}
           showToast={showToast}
+        />
+      )}
+
+      {historyModalData && (
+        <EquipmentHistoryModal
+          equipamentoId={historyModalData.equipamentoId}
+          equipamentoLabel={historyModalData.equipamentoLabel}
+          numeroSerie={historyModalData.numeroSerie}
+          onClose={() => setHistoryModalData(null)}
         />
       )}
     </div>

@@ -218,6 +218,38 @@ export const apiFetchChamados = async () => {
     return [];
 };
 
+export const apiFetchHistoricoEquipamento = async (equipamentoId) => {
+    if (!equipamentoId) return [];
+    try {
+        await ensureAuthSession();
+        const { data, error } = await supabase
+            .from('os_chamados')
+            .select('*, parceiro:parceiros!parceiros_id(*), parceiro_localizacao:parceiros_localizacao!parceiros_localizacao_id(*), equipamento:equipamentos!equipamentos_id(*)')
+            .eq('equipamentos_id', equipamentoId)
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+        if (!error && data) {
+            return data;
+        }
+
+        if (error) {
+            console.warn('Erro ao buscar histórico por equipamentos_id, tentando query alternativa:', error);
+        }
+
+        const { data: plainData } = await supabase
+            .from('os_chamados')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+        return plainData || [];
+    } catch (err) {
+        console.warn('Erro ao buscar histórico do equipamento no Supabase:', err);
+        return [];
+    }
+};
+
 export const apiFetchParceiros = async () => {
     const token = getToken();
     if (token === 'demo-token-mock') {
