@@ -1,28 +1,54 @@
-/* Raupp ERP Corporate Design Tokens */
+/* Raupp ERP Corporate UI/UX Design System 2.0 */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
 :root {
-  --bg-main: #0a0c10;
-  --card-bg: rgba(18, 22, 30, 0.75);
-  --card-glass: rgba(18, 22, 30, 0.85);
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-color-glow: rgba(0, 162, 232, 0.3);
-  --text-primary: #f3f4f6;
-  --text-secondary: #9ca3af;
+  --bg-main: #07090e;
+  --card-bg: rgba(15, 20, 30, 0.75);
+  --card-glass: rgba(15, 20, 30, 0.85);
+  --card-border: rgba(255, 255, 255, 0.08);
+  --card-border-glow: rgba(0, 162, 232, 0.4);
   
-  /* Cores Corporativas Raupp */
-  --raupp-blue-light: #00a2e8;
-  --raupp-blue-dark: #0c5ba6;
-  --raupp-orange: #f28123;
-  --raupp-dark-gray: #333333;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
   
-  /* Cores de feedback */
-  --error: #ef4444;
-  --error-bg: rgba(239, 68, 68, 0.15);
-  --success: #10b981;
-  --success-bg: rgba(16, 185, 129, 0.15);
-  --warning: #f59e0b;
+  /* Cores Corporativas Raupp Soluções */
+  --raupp-blue-light: #38bdf8;
+  --raupp-blue-primary: #00a2e8;
+  --raupp-blue-dark: #0284c7;
+  --raupp-blue-deep: #0c4a6e;
+  --raupp-orange: #f97316;
+  --raupp-orange-dark: #c2410c;
   
+  /* Status Palette UI/UX */
+  --status-aberto: #38bdf8;
+  --status-aberto-bg: rgba(56, 189, 248, 0.12);
+  --status-em-curso: #f59e0b;
+  --status-em-curso-bg: rgba(245, 158, 11, 0.14);
+  --status-concluido: #10b981;
+  --status-concluido-bg: rgba(16, 185, 129, 0.14);
+  --status-clientes: #a855f7;
+  --status-clientes-bg: rgba(168, 85, 247, 0.14);
+  
+  /* Prioridades */
+  --prio-urgente: #ef4444;
+  --prio-urgente-bg: rgba(239, 68, 68, 0.15);
+  --prio-alta: #f97316;
+  --prio-alta-bg: rgba(249, 115, 22, 0.15);
+  --prio-normal: #38bdf8;
+  --prio-normal-bg: rgba(56, 189, 248, 0.15);
+  --prio-baixa: #94a3b8;
+  --prio-baixa-bg: rgba(148, 163, 184, 0.15);
+  
+  --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  --transition-spring: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  
+  --font-family: 'Outfit', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
 }
 
 * {
@@ -35,12 +61,13 @@
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: var(--bg-main);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.16);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
@@ -54,65 +81,67 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
-  padding-bottom: 85px;
+  padding-bottom: 90px;
   overflow-x: hidden;
   position: relative;
 }
 
-/* Elementos de Fundo Decorativos Corporativos Raupp */
+/* Background Glowing Ambient Orbs */
 .bg-decor {
   position: fixed;
   border-radius: 50%;
   filter: blur(120px);
   z-index: 0;
-  opacity: 0.35;
+  opacity: 0.38;
   pointer-events: none;
-  animation: pulseRaupp 10s infinite alternate ease-in-out;
+  animation: pulseRaupp 12s infinite alternate ease-in-out;
 }
 
 .bg-decor-1 {
-  width: 450px;
-  height: 450px;
-  background: radial-gradient(circle, var(--raupp-blue-dark) 0%, transparent 70%);
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, var(--raupp-blue-deep) 0%, rgba(2, 132, 199, 0.3) 50%, transparent 70%);
   top: -10%;
   left: -10%;
 }
 
 .bg-decor-2 {
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, var(--raupp-orange) 0%, transparent 70%);
+  width: 520px;
+  height: 520px;
+  background: radial-gradient(circle, rgba(249, 115, 22, 0.35) 0%, transparent 70%);
   bottom: -15%;
   right: -10%;
-  animation-delay: -5s;
+  animation-delay: -6s;
 }
 
 @keyframes pulseRaupp {
   0% { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(30px, -30px) scale(1.15); }
+  100% { transform: translate(35px, -35px) scale(1.18); }
 }
 
-/* App Wrapper */
+/* App Wrapper Container */
 .app-container {
   position: relative;
   z-index: 10;
   width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
 }
 
-/* Header Corporativo Raupp */
+/* Header Corporativo Raupp UI/UX */
 .app-header {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(10, 12, 16, 0.88);
+  background: rgba(7, 9, 14, 0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--border-color);
-  padding: 14px 20px;
+  border-bottom: 1px solid var(--card-border);
+  padding: 12px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
 }
 
 .header-title-area {
@@ -122,111 +151,120 @@ body {
 }
 
 .logo-wrapper {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 6px 12px;
+  padding: 5px 10px;
   border-radius: 12px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
 }
 
 .logo-img {
-  height: 32px;
+  height: 28px;
   object-fit: contain;
   display: block;
 }
 
 .header-app-name {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: #ffffff;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
 .header-tech-badge {
   font-size: 0.72rem;
-  background: rgba(0, 162, 232, 0.15);
+  background: rgba(56, 189, 248, 0.12);
   color: var(--raupp-blue-light);
-  border: 1px solid rgba(0, 162, 232, 0.35);
-  padding: 3px 10px;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 2px 9px;
   border-radius: 20px;
-  font-weight: 600;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  font-weight: 600;
   margin-top: 2px;
 }
 
 .status-dot-live {
   width: 7px;
   height: 7px;
-  background-color: var(--raupp-blue-light);
   border-radius: 50%;
-  box-shadow: 0 0 10px var(--raupp-blue-light);
-  animation: pulseLive 2s infinite;
+  background-color: var(--status-concluido);
+  box-shadow: 0 0 10px var(--status-concluido);
+  animation: blinkDot 2s infinite ease-in-out;
 }
 
-@keyframes pulseLive {
-  0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 162, 232, 0.8); }
-  70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(0, 162, 232, 0); }
-  100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 162, 232, 0); }
+@keyframes blinkDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
 }
 
-/* Tab Navigation Bar Raupp Style */
+/* Tab Navigation System */
 .tab-navigation {
-  display: flex;
-  background: var(--card-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  margin: 16px;
-  border-radius: 14px;
+  background: rgba(15, 20, 30, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  margin: 12px 16px 16px 16px;
+  border-radius: 16px;
   padding: 5px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--card-border);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  display: flex;
+  gap: 4px;
 }
 
 .tab-button {
   flex: 1;
-  padding: 11px 6px;
+  padding: 10px 4px;
   border: none;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  border-radius: 10px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: var(--transition-smooth);
+  transition: var(--transition-fast);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   font-family: inherit;
+  position: relative;
+}
+
+.tab-button:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .tab-button.active {
-  background: linear-gradient(135deg, var(--raupp-blue-dark), var(--raupp-blue-light));
+  background: linear-gradient(135deg, var(--raupp-blue-dark), var(--raupp-blue-primary));
   color: #ffffff;
-  box-shadow: 0 6px 20px rgba(0, 162, 232, 0.35);
+  box-shadow: 0 6px 20px rgba(0, 162, 232, 0.38);
 }
 
 .tab-count-chip {
-  font-size: 0.75rem;
-  padding: 2px 8px;
+  font-size: 0.72rem;
+  padding: 2px 7px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.18);
   font-weight: 700;
+  line-height: 1;
 }
 
-/* Card Chamado (OS) Raupp Style */
+/* OS Card Glassmorphism Design */
 .os-card {
   background: var(--card-glass);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--border-color);
-  border-radius: 20px;
-  margin: 14px 16px;
-  padding: 18px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--card-border);
+  border-radius: 18px;
+  margin: 12px 16px;
+  padding: 14px 16px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
   transition: var(--transition-smooth);
   position: relative;
   overflow: hidden;
@@ -239,158 +277,158 @@ body {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--raupp-blue-dark), var(--raupp-blue-light), var(--raupp-orange));
+  background: linear-gradient(90deg, var(--raupp-blue-primary), var(--raupp-blue-light), var(--raupp-orange));
 }
 
 .os-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
-  border-color: var(--border-color-glow);
+  border-color: rgba(56, 189, 248, 0.35);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
 }
 
 .os-card-top {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 12px;
+  align-items: center;
+  margin-bottom: 8px;
 }
 
 .os-tag {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: var(--raupp-blue-light);
-  letter-spacing: 0.05em;
-  background: rgba(0, 162, 232, 0.1);
-  padding: 4px 10px;
+  letter-spacing: 0.03em;
+  background: rgba(56, 189, 248, 0.12);
+  padding: 3px 9px;
   border-radius: 8px;
-  border: 1px solid rgba(0, 162, 232, 0.2);
+  border: 1px solid rgba(56, 189, 248, 0.25);
 }
 
 .badge-prio {
-  padding: 4px 12px;
+  padding: 3px 10px;
   border-radius: 20px;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
-.prio-urgente { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); box-shadow: 0 0 12px rgba(239, 68, 68, 0.2); }
-.prio-alta { background: rgba(242, 129, 35, 0.2); color: var(--raupp-orange); border: 1px solid rgba(242, 129, 35, 0.4); box-shadow: 0 0 12px rgba(242, 129, 35, 0.2); }
-.prio-normal { background: rgba(0, 162, 232, 0.2); color: var(--raupp-blue-light); border: 1px solid rgba(0, 162, 232, 0.4); }
-.prio-baixa { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid rgba(203, 213, 225, 0.4); }
+.prio-urgente { background: var(--prio-urgente-bg); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); box-shadow: 0 0 10px rgba(239, 68, 68, 0.25); }
+.prio-alta { background: var(--prio-alta-bg); color: var(--raupp-orange); border: 1px solid rgba(249, 115, 22, 0.4); box-shadow: 0 0 10px rgba(249, 115, 22, 0.25); }
+.prio-normal { background: var(--prio-normal-bg); color: var(--raupp-blue-light); border: 1px solid rgba(56, 189, 248, 0.35); }
+.prio-baixa { background: var(--prio-baixa-bg); color: #cbd5e1; border: 1px solid rgba(203, 213, 225, 0.35); }
 
 .client-title {
-  font-size: 1.2rem;
+  font-size: 1.08rem;
   font-weight: 700;
   color: #ffffff;
-  margin-bottom: 10px;
-  line-height: 1.3;
+  line-height: 1.25;
+  margin-bottom: 4px;
 }
 
 .card-detail-row {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  font-size: 0.88rem;
+  gap: 9px;
+  font-size: 0.84rem;
   color: var(--text-secondary);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  line-height: 1.35;
 }
 
 .card-detail-row i {
   color: var(--raupp-blue-light);
-  margin-top: 3px;
-  font-size: 0.95rem;
+  margin-top: 2px;
+  font-size: 0.9rem;
 }
 
 .equipment-chip-box {
-  background: rgba(10, 12, 16, 0.6);
-  border: 1px solid var(--border-color);
+  background: rgba(7, 9, 14, 0.65);
+  border: 1px solid var(--card-border);
   padding: 8px 12px;
   border-radius: 12px;
-  margin-top: 6px;
-  margin-bottom: 10px;
+  margin-top: 8px;
+  margin-bottom: 8px;
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
 .equipment-chip {
-  background: rgba(0, 162, 232, 0.15);
-  border: 1px solid rgba(0, 162, 232, 0.3);
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.3);
   color: var(--raupp-blue-light);
-  padding: 4px 10px;
+  padding: 3px 9px;
   border-radius: 8px;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
 .problem-box {
-  background: rgba(10, 12, 16, 0.7);
-  padding: 12px 14px;
+  background: rgba(7, 9, 14, 0.7);
+  padding: 10px 12px;
   border-radius: 12px;
-  margin-top: 12px;
-  font-size: 0.88rem;
-  border-left: 4px solid var(--raupp-blue-light);
+  margin-top: 8px;
+  font-size: 0.84rem;
+  border-left: 3px solid var(--raupp-blue-light);
 }
 
 .laudo-box {
-  background: rgba(16, 185, 129, 0.12);
+  background: rgba(16, 185, 129, 0.1);
   padding: 12px 14px;
   border-radius: 12px;
-  margin-top: 12px;
-  font-size: 0.88rem;
-  border-left: 4px solid var(--success);
+  margin-top: 10px;
+  font-size: 0.84rem;
+  border-left: 3px solid var(--status-concluido);
 }
 
 .actions-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border-color);
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--card-border);
 }
 
 .btn-mobile {
-  padding: 12px 14px;
+  padding: 10px 12px;
   border-radius: 12px;
   border: none;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 7px;
   cursor: pointer;
   text-decoration: none;
   color: #fff;
   font-family: inherit;
-  transition: var(--transition-smooth);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  transition: var(--transition-fast);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
 .btn-mobile:active {
   transform: scale(0.96);
 }
 
-.btn-maps { background: linear-gradient(135deg, var(--raupp-blue-dark), var(--raupp-blue-light)); color: #fff; box-shadow: 0 4px 14px rgba(0, 162, 232, 0.3); }
-.btn-call { background: linear-gradient(135deg, #1f2937, #374151); color: #fff; border: 1px solid var(--border-color); }
-.btn-wats { background: linear-gradient(135deg, #15803d, #22c55e); color: #fff; box-shadow: 0 4px 14px rgba(34, 197, 94, 0.3); }
-.btn-start { background: linear-gradient(135deg, var(--raupp-blue-dark), var(--raupp-blue-light)); grid-column: span 2; font-size: 0.95rem; }
-.btn-complete { background: linear-gradient(135deg, var(--raupp-orange), #d97706); grid-column: span 2; font-size: 0.95rem; box-shadow: 0 4px 16px rgba(242, 129, 35, 0.35); }
+.btn-maps { background: linear-gradient(135deg, var(--raupp-blue-dark), var(--raupp-blue-primary)); color: #fff; box-shadow: 0 4px 14px rgba(0, 162, 232, 0.35); }
+.btn-call { background: linear-gradient(135deg, #1e293b, #334155); color: #fff; border: 1px solid var(--card-border); }
+.btn-wats { background: linear-gradient(135deg, #16a34a, #22c55e); color: #fff; box-shadow: 0 4px 14px rgba(34, 197, 94, 0.35); }
+.btn-start { background: linear-gradient(135deg, var(--raupp-blue-dark), var(--raupp-blue-primary)); grid-column: span 2; font-size: 0.9rem; }
+.btn-complete { background: linear-gradient(135deg, var(--raupp-orange), var(--raupp-orange-dark)); grid-column: span 2; font-size: 0.9rem; box-shadow: 0 4px 16px rgba(249, 115, 22, 0.38); }
 
-/* Modais Raupp Style */
+/* Modais UI/UX Design */
 .modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 200;
-  background: rgba(10, 12, 16, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(7, 9, 14, 0.88);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -405,19 +443,19 @@ body {
 
 .modal-card {
   background: var(--card-glass);
-  border: 1px solid var(--border-color-glow);
-  border-radius: 24px;
+  border: 1px solid var(--card-border-glow);
+  border-radius: 22px;
   width: 100%;
   max-width: 480px;
   max-height: 92vh;
   overflow-y: auto;
-  padding: 26px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+  padding: 22px 24px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
   animation: modalScale 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes modalScale {
-  from { transform: scale(0.92); opacity: 0; }
+  from { transform: scale(0.94); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
 
@@ -425,31 +463,31 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .modal-title {
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   font-weight: 700;
   color: #ffffff;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .modal-close-icon {
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--card-border);
   color: var(--text-secondary);
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: var(--transition-smooth);
+  transition: var(--transition-fast);
 }
 
 .modal-close-icon:hover {
@@ -458,72 +496,74 @@ body {
 }
 
 .form-group-field {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .form-label-styled {
   display: block;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 6px;
+  margin-bottom: 5px;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.4px;
 }
 
 .input-styled {
   width: 100%;
-  padding: 12px 14px;
+  padding: 10px 14px;
   border-radius: 12px;
-  border: 1px solid var(--border-color);
-  background: rgba(10, 12, 16, 0.85);
+  border: 1px solid var(--card-border);
+  background: rgba(7, 9, 14, 0.85);
   color: #ffffff;
   font-family: inherit;
-  font-size: 0.92rem;
-  transition: var(--transition-smooth);
+  font-size: 0.9rem;
+  transition: var(--transition-fast);
 }
 
 .input-styled:focus {
   outline: none;
   border-color: var(--raupp-blue-light);
-  box-shadow: 0 0 0 3px rgba(0, 162, 232, 0.25);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
 }
 
-/* Canvas de Assinatura Raupp Style */
+/* Canvas Assinatura Pad */
 .signature-box {
-  border: 2px dashed rgba(0, 162, 232, 0.4);
+  border: 2px dashed rgba(56, 189, 248, 0.4);
   border-radius: 14px;
   background: #ffffff;
   position: relative;
   touch-action: none;
-  margin-top: 8px;
+  margin-top: 6px;
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 .signature-canvas-element {
   width: 100%;
-  height: 170px;
+  height: 160px;
   display: block;
   cursor: crosshair;
 }
 
-/* Toast */
+/* Toast Component */
 .toast-floating {
   position: fixed;
   top: 16px;
   right: 16px;
   left: 16px;
   z-index: 300;
-  padding: 14px 18px;
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 12px 16px;
   border-radius: 14px;
   color: #fff;
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 12px;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5);
+  gap: 10px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.6);
   animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
