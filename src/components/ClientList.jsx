@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 
 export function ClientList({ parceiros, loading }) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [expandedId, setExpandedId] = useState(null);
+
+  const toggleExpand = (id) => {
+    setExpandedId(expandedId === id ? null : id);
+  };
 
   const filteredParceiros = parceiros.filter((p) => {
     const term = searchTerm.toLowerCase();
@@ -20,11 +25,11 @@ export function ClientList({ parceiros, loading }) {
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       {/* Barra de Pesquisa */}
-      <div className="os-card" style={{ padding: '16px 20px', margin: 0 }}>
+      <div className="os-card" style={{ padding: '14px 16px', margin: 0 }}>
         <div className="form-group-field" style={{ margin: 0 }}>
-          <label className="form-label-styled" style={{ marginBottom: '8px' }}>
+          <label className="form-label-styled" style={{ marginBottom: '6px' }}>
             <i className="fa-solid fa-magnifying-glass" style={{ marginRight: '6px', color: '#60a5fa' }}></i>
             Buscar Cliente / Parceiro
           </label>
@@ -68,7 +73,7 @@ export function ClientList({ parceiros, loading }) {
             )}
           </div>
         </div>
-        <div style={{ marginTop: '10px', fontSize: '0.78rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between' }}>
+        <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between' }}>
           <span>Exibindo {filteredParceiros.length} de {parceiros.length} clientes</span>
           {searchTerm && <span>Filtro ativo: "{searchTerm}"</span>}
         </div>
@@ -87,6 +92,7 @@ export function ClientList({ parceiros, loading }) {
         </div>
       ) : (
         filteredParceiros.map((p) => {
+          const isExpanded = expandedId === p.id_parceiros;
           const foneClean = (p.contato1_fone || '').replace(/\D/g, '');
           const hasPhone = foneClean.length >= 8;
 
@@ -110,88 +116,133 @@ export function ClientList({ parceiros, loading }) {
           const localizacoes = p.localizacoes || [];
 
           return (
-            <div className="os-card" key={p.id_parceiros}>
-              <div className="os-card-top">
-                <span className="os-tag" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
-                  <i className="fa-solid fa-building" style={{ marginRight: '4px' }}></i>
-                  {p.tipo_pessoa || 'PJ'}
-                </span>
-                {p.doc_principal && (
-                  <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 500 }}>
-                    Doc: <strong style={{ color: '#f1f5f9' }}>{p.doc_principal}</strong>
+            <div className="os-card" key={p.id_parceiros} style={{ padding: '14px 16px' }}>
+              {/* Visão Compacta */}
+              <div className="os-card-top" style={{ marginBottom: '6px' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span className="os-tag" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
+                    <i className="fa-solid fa-building" style={{ marginRight: '4px' }}></i>
+                    {p.tipo_pessoa || 'PJ'}
                   </span>
-                )}
+                  {p.doc_principal && (
+                    <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 500 }}>
+                      Doc: <strong style={{ color: '#f1f5f9' }}>{p.doc_principal}</strong>
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  className="btn-expand-toggle"
+                  onClick={() => toggleExpand(p.id_parceiros)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    color: '#38bdf8',
+                    padding: '4px 10px',
+                    borderRadius: '16px',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  {isExpanded ? (
+                    <>
+                      <i className="fa-solid fa-chevron-up"></i> Recolher
+                    </>
+                  ) : (
+                    <>
+                      <i className="fa-solid fa-chevron-down"></i> Detalhes
+                    </>
+                  )}
+                </button>
               </div>
 
-              <div className="client-title">{p.nome_principal}</div>
+              <div className="client-title" style={{ fontSize: '1.05rem', marginBottom: '4px' }}>
+                {p.nome_principal}
+              </div>
 
-              {p.nome_secundario && p.nome_secundario !== p.nome_principal && (
-                <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '-4px', marginBottom: '8px' }}>
-                  Fantasia: <strong style={{ color: '#cbd5e1' }}>{p.nome_secundario}</strong>
+              {!isExpanded && endCid && (
+                <div style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+                  <i className="fa-solid fa-location-dot" style={{ marginRight: '4px', color: '#38bdf8' }}></i>
+                  {[endBairro, endCid ? `${endCid} - ${endUf}` : ''].filter(Boolean).join(', ')}
                 </div>
               )}
 
-              {enderecoCompleto && (
-                <div className="card-detail-row">
-                  <i className="fa-solid fa-location-dot" style={{ color: '#f43f5e' }}></i>
-                  <span>{enderecoCompleto}</span>
-                </div>
-              )}
+              {/* Visão Expandida */}
+              {isExpanded && (
+                <div style={{ animation: 'fadeIn 0.2s ease-out', marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+                  {p.nome_secundario && p.nome_secundario !== p.nome_principal && (
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '8px' }}>
+                      Fantasia: <strong style={{ color: '#cbd5e1' }}>{p.nome_secundario}</strong>
+                    </div>
+                  )}
 
-              {(p.contato1_nome || p.contato1_fone) && (
-                <div className="card-detail-row">
-                  <i className="fa-solid fa-user-gear" style={{ color: '#34d399' }}></i>
-                  <span>
-                    Contato: <strong style={{ color: '#fff' }}>{p.contato1_nome || 'Responsável'}</strong>{' '}
-                    {p.contato1_fone ? `(${p.contato1_fone})` : ''}
-                  </span>
-                </div>
-              )}
+                  {enderecoCompleto && (
+                    <div className="card-detail-row">
+                      <i className="fa-solid fa-location-dot" style={{ color: '#f43f5e' }}></i>
+                      <span>{enderecoCompleto}</span>
+                    </div>
+                  )}
 
-              {/* Locais / Filiais cadastradas */}
-              {localizacoes.length > 0 && (
-                <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
-                  <strong style={{ fontSize: '0.72rem', color: '#60a5fa', display: 'block', textTransform: 'uppercase', marginBottom: '4px' }}>
-                    <i className="fa-solid fa-sitemap" style={{ marginRight: '4px' }}></i> Locais / Unidades ({localizacoes.length}):
-                  </strong>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {localizacoes.map((loc) => {
-                      const locAddr = [loc.end_logradouro, loc.end_numero, loc.end_bairro, loc.end_cidade].filter(Boolean).join(', ');
-                      return (
-                        <div
-                          key={loc.id_parceiros_localizacao}
-                          style={{
-                            fontSize: '0.78rem',
-                            color: '#cbd5e1',
-                            background: 'rgba(15, 23, 42, 0.6)',
-                            padding: '6px 10px',
-                            borderRadius: '6px',
-                            border: '1px solid rgba(255,255,255,0.05)'
-                          }}
-                        >
-                          <strong style={{ color: '#38bdf8' }}>{loc.nome_site || 'Unidade'}:</strong> {locAddr || 'Endereço não informado'}
-                          {loc.contato1_fone && <span style={{ color: '#94a3b8', marginLeft: '6px' }}>({loc.contato1_fone})</span>}
-                        </div>
-                      );
-                    })}
+                  {(p.contato1_nome || p.contato1_fone) && (
+                    <div className="card-detail-row">
+                      <i className="fa-solid fa-user-gear" style={{ color: '#34d399' }}></i>
+                      <span>
+                        Contato: <strong style={{ color: '#fff' }}>{p.contato1_nome || 'Responsável'}</strong>{' '}
+                        {p.contato1_fone ? `(${p.contato1_fone})` : ''}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Locais / Filiais cadastradas */}
+                  {localizacoes.length > 0 && (
+                    <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+                      <strong style={{ fontSize: '0.72rem', color: '#60a5fa', display: 'block', textTransform: 'uppercase', marginBottom: '4px' }}>
+                        <i className="fa-solid fa-sitemap" style={{ marginRight: '4px' }}></i> Locais / Unidades ({localizacoes.length}):
+                      </strong>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {localizacoes.map((loc) => {
+                          const locAddr = [loc.end_logradouro, loc.end_numero, loc.end_bairro, loc.end_cidade].filter(Boolean).join(', ');
+                          return (
+                            <div
+                              key={loc.id_parceiros_localizacao}
+                              style={{
+                                fontSize: '0.78rem',
+                                color: '#cbd5e1',
+                                background: 'rgba(15, 23, 42, 0.6)',
+                                padding: '6px 10px',
+                                borderRadius: '6px',
+                                border: '1px solid rgba(255,255,255,0.05)'
+                              }}
+                            >
+                              <strong style={{ color: '#38bdf8' }}>{loc.nome_site || 'Unidade'}:</strong> {locAddr || 'Endereço não informado'}
+                              {loc.contato1_fone && <span style={{ color: '#94a3b8', marginLeft: '6px' }}>({loc.contato1_fone})</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Botões de Ação Rápida */}
+                  <div className="actions-grid" style={{ marginTop: '14px' }}>
+                    {enderecoCompleto && (
+                      <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="btn-mobile btn-maps">
+                        <i className="fa-solid fa-map-location-dot"></i> Maps / Waze
+                      </a>
+                    )}
+
+                    {hasPhone && (
+                      <a href={`https://wa.me/55${foneClean}`} target="_blank" rel="noopener noreferrer" className="btn-mobile btn-wats">
+                        <i className="fa-brands fa-whatsapp"></i> WhatsApp
+                      </a>
+                    )}
                   </div>
                 </div>
               )}
-
-              {/* Botões de Ação Rápida */}
-              <div className="actions-grid" style={{ marginTop: '14px' }}>
-                {enderecoCompleto && (
-                  <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="btn-mobile btn-maps">
-                    <i className="fa-solid fa-map-location-dot"></i> Maps / Waze
-                  </a>
-                )}
-
-                {hasPhone && (
-                  <a href={`https://wa.me/55${foneClean}`} target="_blank" rel="noopener noreferrer" className="btn-mobile btn-wats">
-                    <i className="fa-brands fa-whatsapp"></i> WhatsApp
-                  </a>
-                )}
-              </div>
             </div>
           );
         })
