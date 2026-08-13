@@ -5,6 +5,7 @@ import { Header } from './components/Header';
 import { TabNav } from './components/TabNav';
 import { OsCard } from './components/OsCard';
 import { ClientList } from './components/ClientList';
+import { CityFilter } from './components/CityFilter';
 import { SignatureModal } from './components/SignatureModal';
 import { Toast } from './components/Toast';
 
@@ -13,6 +14,7 @@ export function App() {
   const [chamados, setChamados] = useState([]);
   const [parceiros, setParceiros] = useState([]);
   const [currentTab, setCurrentTab] = useState('aberto');
+  const [selectedCity, setSelectedCity] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingParceiros, setLoadingParceiros] = useState(false);
   const [activeOsForSignature, setActiveOsForSignature] = useState(null);
@@ -66,6 +68,7 @@ export function App() {
     setUserState(null);
     setChamados([]);
     setParceiros([]);
+    setSelectedCity('');
   };
 
   const handleStartOs = async (osId) => {
@@ -105,15 +108,46 @@ export function App() {
     );
   }
 
-  // Filtragem e Contadores
-  const abertos = chamados.filter(c => c.status_chamado === 'aberto');
-  const emCurso = chamados.filter(c => c.status_chamado === 'em_atendimento');
-  const concluidos = chamados.filter(c => c.status_chamado === 'concluido');
-  const filteredList = chamados.filter(c => c.status_chamado === currentTab);
+  // Extração de Cidades Únicas com Contadores
+  const citiesMap = {};
+
+  chamados.forEach(c => {
+    const loc = c.parceiro_localizacao || {};
+    const parceiro = c.parceiro || {};
+    const city = (loc.end_cidade || parceiro.end_cidade || '').trim();
+    if (city) {
+      const key = city.toUpperCase();
+      if (!citiesMap[key]) {
+        citiesMap[key] = { name: city, count: 0 };
+      }
+      citiesMap[key].count += 1;
+    }
+  });
+
+  const availableCities = Object.values(citiesMap).sort((a, b) => b.count - a.count);
+
+  // Filtragem por Cidade
+  const filteredByCityChamados = selectedCity
+    ? chamados.filter(c => {
+        const loc = c.parceiro_localizacao || {};
+        const parceiro = c.parceiro || {};
+        const city = (loc.end_cidade || parceiro.end_cidade || '').toLowerCase();
+        return city.includes(selectedCity.toLowerCase());
+      })
+    : chamados;
+
+  const abertos = filteredByCityChamados.filter(c => c.status_chamado === 'aberto');
+  const emCurso = filteredByCityChamados.filter(c => c.status_chamado === 'em_atendimento');
+  const concluidos = filteredByCityChamados.filter(c => c.status_chamado === 'concluido');
+  const filteredList = filteredByCityChamados.filter(c => c.status_chamado === currentTab);
+
+  const filteredByCityParceiros = selectedCity
+    ? parceiros.filter(p => (p.end_cidade || '').toLowerCase().includes(selectedCity.toLowerCase()))
+    : parceiros;
 
   return (
     <div className="app-container">
-      {/* Background Decorativo Raupp ERP (Blobs de luz Azul e Laranja) */}
+      {/* Background Decorativo Raupp ERP */}
       <div className="bg-decor bg-decor-1"></div>
       <div className="bg-decor bg-decor-2"></div>
 
@@ -128,13 +162,22 @@ export function App() {
           abertos: abertos.length,
           emCurso: emCurso.length,
           concluidos: concluidos.length,
-          clientes: parceiros.length
+          clientes: filteredByCityParceiros.length
         }}
       />
 
+      {/* Componente de Filtro por Cidade */}
+      {!loading && (
+        <CityFilter
+          selectedCity={selectedCity}
+          onSelectCity={setSelectedCity}
+          cities={availableCities}
+        />
+      )}
+
       <main style={{ minHeight: '300px', position: 'relative', zIndex: 10 }}>
         {currentTab === 'clientes' ? (
-          <ClientList parceiros={parceiros} loading={loadingParceiros} />
+          <ClientList parceiros={parceiros} loading={loadingParceiros} selectedCity={selectedCity} />
         ) : loading ? (
           <div style={{ textAlign: 'center', padding: '50px 20px', color: '#94a3b8' }}>
             <i className="fa-solid fa-spinner fa-spin fa-2x" style={{ color: '#00a2e8' }}></i>
@@ -143,7 +186,11 @@ export function App() {
         ) : filteredList.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
             <i className="fa-solid fa-folder-open fa-3x" style={{ opacity: 0.5 }}></i>
-            <p style={{ marginTop: '12px', fontWeight: 500 }}>Nenhuma Ordem de Serviço nesta aba.</p>
+            <p style={{ marginTop: '12px', fontWeight: 500 }}>
+              {selectedCity
+                ? `Nenhuma Ordem de Serviço na cidade de ${selectedCity} nesta aba.`
+                : 'Nenhuma Ordem de Serviço nesta aba.'}
+            </p>
           </div>
         ) : (
           filteredList.map(os => (

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export function ClientList({ parceiros, loading }) {
+export function ClientList({ parceiros, loading, selectedCity }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState(null);
 
@@ -9,6 +9,11 @@ export function ClientList({ parceiros, loading }) {
   };
 
   const filteredParceiros = parceiros.filter((p) => {
+    if (selectedCity) {
+      const cityMatches = (p.end_cidade || '').toLowerCase() === selectedCity.toLowerCase();
+      if (!cityMatches) return false;
+    }
+
     const term = searchTerm.toLowerCase();
     const nome = (p.nome_principal || '').toLowerCase();
     const fantasia = (p.nome_secundario || '').toLowerCase();
