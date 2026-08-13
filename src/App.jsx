@@ -3,7 +3,7 @@ import { getToken, getUser, apiFetchChamados, apiFetchParceiros, apiAtualizarSta
 import { Login } from './components/Login';
 import { Header } from './components/Header';
 import { TabNav } from './components/TabNav';
-import { BatchOsCard } from './components/BatchOsCard';
+import { OsCard } from './components/OsCard';
 import { ClientList } from './components/ClientList';
 import { CityFilter } from './components/CityFilter';
 import { SignatureModal } from './components/SignatureModal';
@@ -18,7 +18,6 @@ export function App() {
   const [loading, setLoading] = useState(true);
   const [loadingParceiros, setLoadingParceiros] = useState(false);
   const [activeOsForSignature, setActiveOsForSignature] = useState(null);
-  const [activeBatchForSignature, setActiveBatchForSignature] = useState(null);
   const [toast, setToast] = useState({ message: '', type: 'info' });
 
   const showToast = (message, type = 'info') => {
@@ -83,38 +82,7 @@ export function App() {
     }
   };
 
-  const handleStartBatch = async (osIds) => {
-    try {
-      await Promise.all(
-        osIds.map(id => apiAtualizarStatusChamado(id, { status_chamado: 'em_atendimento' }))
-      );
-      showToast(`Atendimento iniciado para o lote de ${osIds.length} Ordens de Serviço!`, 'success');
-      setCurrentTab('em_atendimento');
-      loadData();
-    } catch (err) {
-      showToast(err.message || 'Erro ao iniciar lote de atendimentos.', 'error');
-    }
-  };
-
   const handleCompleteOsSubmit = async (payload) => {
-    if (activeBatchForSignature && activeBatchForSignature.length > 0) {
-      try {
-        await Promise.all(
-          activeBatchForSignature.map(osItem =>
-            apiAtualizarStatusChamado(osItem.id_os_chamados, payload)
-          )
-        );
-        showToast(`Lote de ${activeBatchForSignature.length} Ordens de Serviço concluído com 1 Assinatura Digital!`, 'success');
-        setActiveBatchForSignature(null);
-        setCurrentTab('concluido');
-        loadData();
-      } catch (err) {
-        showToast(err.message || 'Erro ao concluir lote de Ordens de Serviço.', 'error');
-        throw err;
-      }
-      return;
-    }
-
     if (!activeOsForSignature) return;
     try {
       await apiAtualizarStatusChamado(activeOsForSignature.id_os_chamados, payload);
@@ -173,31 +141,6 @@ export function App() {
   const concluidos = filteredByCityChamados.filter(c => c.status_chamado === 'concluido');
   const filteredList = filteredByCityChamados.filter(c => c.status_chamado === currentTab);
 
-  // Agrupamento Inteligente por Local (Smart Batching)
-  const groupChamadosByLocation = (osList) => {
-    const groupsMap = {};
-
-    osList.forEach(os => {
-      const pId = os.parceiros_id || os.parceiro?.id_parceiros || 'desconhecido';
-      const locId = os.parceiros_localizacao_id || os.parceiro_localizacao?.id_parceiros_localizacao || 'principal';
-      const key = `${pId}_${locId}`;
-
-      if (!groupsMap[key]) {
-        groupsMap[key] = {
-          groupKey: key,
-          parceiro: os.parceiro,
-          localizacao: os.parceiro_localizacao,
-          chamados: []
-        };
-      }
-      groupsMap[key].chamados.push(os);
-    });
-
-    return Object.values(groupsMap);
-  };
-
-  const groupedList = groupChamadosByLocation(filteredList);
-
   const filteredByCityParceiros = selectedCity
     ? parceiros.filter(p => (p.end_cidade || '').toLowerCase().includes(selectedCity.toLowerCase()))
     : parceiros;
@@ -240,7 +183,7 @@ export function App() {
             <i className="fa-solid fa-spinner fa-spin fa-2x" style={{ color: '#00a2e8' }}></i>
             <p style={{ marginTop: '12px', fontWeight: 500 }}>Carregando Ordens de Serviço...</p>
           </div>
-        ) : groupedList.length === 0 ? (
+        ) : filteredList.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
             <i className="fa-solid fa-folder-open fa-3x" style={{ opacity: 0.5 }}></i>
             <p style={{ marginTop: '12px', fontWeight: 500 }}>
@@ -250,27 +193,22 @@ export function App() {
             </p>
           </div>
         ) : (
-          groupedList.map(group => (
-            <BatchOsCard
-              key={group.groupKey}
-              group={group}
+          filteredList.map(os => (
+            <OsCard
+              key={os.id_os_chamados}
+              os={os}
               currentTab={currentTab}
               onStartOs={handleStartOs}
-              onStartBatch={handleStartBatch}
               onOpenSignatureModal={setActiveOsForSignature}
-              onOpenBatchSignatureModal={setActiveBatchForSignature}
             />
           ))
         )}
       </main>
 
-      {(activeOsForSignature || activeBatchForSignature) && (
+      {activeOsForSignature && (
         <SignatureModal
-          os={activeOsForSignature || (activeBatchForSignature ? activeBatchForSignature[0] : null)}
-          onClose={() => {
-            setActiveOsForSignature(null);
-            setActiveBatchForSignature(null);
-          }}
+          os={activeOsForSignature}
+          onClose={() => setActiveOsForSignature(null)}
           onSubmit={handleCompleteOsSubmit}
           showToast={showToast}
         />
