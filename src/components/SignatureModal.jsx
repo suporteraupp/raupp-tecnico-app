@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 
-export function SignatureModal({ os, onClose, onSubmit, showToast }) {
+export function SignatureModal({ os: _os, onClose, onSubmit, showToast }) {
   const canvasRef = useRef(null);
   const [laudo, setLaudo] = useState('');
   const [contadorPb, setContadorPb] = useState('');

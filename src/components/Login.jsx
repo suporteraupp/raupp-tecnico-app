@@ -37,7 +37,7 @@ export function Login({ onLoginSuccess, showToast }) {
       const data = await apiLogin(usuario.trim() || 'Técnico Raupp', '', true);
       showToast('Entrou no Modo Demonstração (Sem Backend)!', 'info');
       onLoginSuccess(data.user);
-    } catch (err) {
+    } catch {
       showToast('Erro ao iniciar modo demonstração.', 'error');
     } finally {
       setLoading(false);
