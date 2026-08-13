@@ -97,10 +97,10 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
 
     try {
       setLoading(true);
+      const laudoCompleto = `${laudo.trim()}\n---ASSINATURA---\n${signatureBase64}`;
       await onSubmit({
         status_chamado: 'concluido',
-        laudo_tecnico: laudo.trim(),
-        assinatura_cliente: signatureBase64,
+        laudo_tecnico: laudoCompleto,
         contador_pb_atendimento: contadorPb ? parseInt(contadorPb) : undefined,
         contador_cor_atendimento: contadorCor ? parseInt(contadorCor) : undefined
       });

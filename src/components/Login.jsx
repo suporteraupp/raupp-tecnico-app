@@ -18,10 +18,27 @@ export function Login({ onLoginSuccess, showToast }) {
       const data = await apiLogin(usuario.trim(), password.trim());
       setToken(data.token);
       setUser(data.user);
-      showToast(`Bem-vindo, ${data.user.nome}!`, 'success');
+      if (data.wasFallback) {
+        showToast('Servidor API offline. Conectado em Modo Demonstração!', 'info');
+      } else {
+        showToast(`Bem-vindo, ${data.user.nome}!`, 'success');
+      }
       onLoginSuccess(data.user);
     } catch (err) {
       showToast(err.message || 'Erro ao realizar login.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    try {
+      setLoading(true);
+      const data = await apiLogin(usuario.trim() || 'Técnico Raupp', '', true);
+      showToast('Entrou no Modo Demonstração (Sem Backend)!', 'info');
+      onLoginSuccess(data.user);
+    } catch (err) {
+      showToast('Erro ao iniciar modo demonstração.', 'error');
     } finally {
       setLoading(false);
     }
@@ -76,7 +93,6 @@ export function Login({ onLoginSuccess, showToast }) {
                   placeholder="Seu usuário ou e-mail"
                   value={usuario}
                   onChange={(e) => setUsuario(e.target.value)}
-                  required
                 />
               </div>
             </div>
@@ -101,7 +117,6 @@ export function Login({ onLoginSuccess, showToast }) {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  required
                 />
               </div>
             </div>
@@ -122,6 +137,23 @@ export function Login({ onLoginSuccess, showToast }) {
                 </>
               )}
             </button>
+
+            <button
+              type="button"
+              onClick={handleDemoLogin}
+              className="btn-mobile"
+              disabled={loading}
+              style={{
+                width: '100%',
+                padding: '12px',
+                fontSize: '0.9rem',
+                background: 'rgba(56, 189, 248, 0.1)',
+                color: '#38bdf8',
+                border: '1px dashed rgba(56, 189, 248, 0.4)'
+              }}
+            >
+              <i className="fa-solid fa-bolt"></i> Entrar em Modo Demonstração (Offline)
+            </button>
           </form>
 
           <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
@@ -133,3 +165,4 @@ export function Login({ onLoginSuccess, showToast }) {
     </div>
   );
 }
+

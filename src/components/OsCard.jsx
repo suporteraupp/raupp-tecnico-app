@@ -2,26 +2,54 @@ import React from 'react';
 
 export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal }) {
   const parceiro = os.parceiro || {};
+  const loc = os.parceiro_localizacao || {};
   const equip = os.equipamento || {};
   const marca = equip.marca ? equip.marca.nome_marca : '';
   const modelo = equip.modelo ? equip.modelo.nome_modelo : '';
   const equipLabel = [marca, modelo].filter(Boolean).join(' ') || equip.tipo_equipamento || 'Equipamento não especificado';
 
   const prioClass = `prio-${(os.prioridade || 'normal').toLowerCase()}`;
-  const numOsFormatted = `OS #${String(os.id_os_chamados || '').substring(0, 8).toUpperCase()}`;
+  const numOsFormatted = os.numero_os ? `OS #${os.numero_os}` : `OS #${String(os.id_os_chamados || '').substring(0, 8).toUpperCase()}`;
 
   // Telefone / Contatos
-  const foneCliente = os.solicitante_telefone || parceiro.contato1_fone || parceiro.doc_principal || '';
+  const foneCliente = os.solicitante_telefone || loc.contato1_fone || parceiro.contato1_fone || parceiro.doc_principal || '';
   const foneClean = foneCliente.replace(/\D/g, '');
   const hasPhone = foneClean.length >= 8;
 
-  // Endereço Completo para o Google Maps
-  const endLog = parceiro.end_logradouro || '';
-  const endNum = parceiro.end_numero || '';
-  const endBairro = parceiro.end_bairro || '';
-  const endCid = parceiro.end_cidade || '';
-  const enderecoCompleto = [endLog, endNum, endBairro, endCid].filter(Boolean).join(', ');
+  // Endereço Completo real (pega do local da OS ou do cadastro principal do parceiro)
+  const endLog = loc.end_logradouro || parceiro.end_logradouro || '';
+  const endNum = loc.end_numero || parceiro.end_numero || '';
+  const endComp = loc.end_complemento || parceiro.end_complemento || '';
+  const endBairro = loc.end_bairro || parceiro.end_bairro || '';
+  const endCid = loc.end_cidade || parceiro.end_cidade || '';
+  const endUf = loc.end_uf || parceiro.end_uf || '';
+
+  const localNome = loc.nome_site && loc.nome_site !== 'Principal' ? loc.nome_site : '';
+
+  const partesEndereco = [
+    localNome ? `[${localNome}]` : '',
+    endLog ? `${endLog}${endNum ? `, ${endNum}` : ''}` : '',
+    endComp,
+    endBairro,
+    endCid ? `${endCid}${endUf ? ` - ${endUf}` : ''}` : ''
+  ].filter(Boolean);
+
+  const enderecoCompleto = partesEndereco.join(' - ');
   const mapsUrl = enderecoCompleto ? `https://maps.google.com/?q=${encodeURIComponent(enderecoCompleto)}` : '#';
+
+  // Tratamento do Laudo Técnico + Assinatura Digital embutida
+  let laudoTexto = os.laudo_tecnico || '';
+  let laudoAssinatura = null;
+
+  if (laudoTexto.includes('---ASSINATURA---')) {
+    const parts = laudoTexto.split('---ASSINATURA---');
+    laudoTexto = parts[0].trim();
+    laudoAssinatura = parts[1] ? parts[1].trim() : null;
+  } else if (laudoTexto.includes('[Assinatura Digital]:')) {
+    const parts = laudoTexto.split('[Assinatura Digital]:');
+    laudoTexto = parts[0].trim();
+    laudoAssinatura = parts[1] ? parts[1].trim() : null;
+  }
 
   return (
     <div className="os-card">
@@ -68,12 +96,27 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal }) {
         <span style={{ color: '#f1f5f9' }}>{os.descricao_problema}</span>
       </div>
 
-      {os.laudo_tecnico && (
+      {laudoTexto && (
         <div className="laudo-box">
           <strong style={{ color: '#34d399', fontSize: '0.75rem', display: 'block', textTransform: 'uppercase', marginBottom: '4px' }}>
             <i className="fa-solid fa-clipboard-check" style={{ marginRight: '4px', color: '#34d399' }}></i> Laudo Técnico:
           </strong>
-          <span style={{ color: '#f1f5f9' }}>{os.laudo_tecnico}</span>
+          <span style={{ color: '#f1f5f9', whiteSpace: 'pre-wrap' }}>{laudoTexto}</span>
+
+          {laudoAssinatura && (
+            <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed rgba(52, 211, 153, 0.3)' }}>
+              <strong style={{ color: '#60a5fa', fontSize: '0.72rem', display: 'block', textTransform: 'uppercase', marginBottom: '6px' }}>
+                <i className="fa-solid fa-signature" style={{ marginRight: '4px', color: '#60a5fa' }}></i> Assinatura Digital do Cliente:
+              </strong>
+              <div style={{ background: '#ffffff', borderRadius: '6px', padding: '6px 12px', display: 'inline-block', maxWidth: '100%' }}>
+                <img
+                  src={laudoAssinatura}
+                  alt="Assinatura do Cliente"
+                  style={{ maxHeight: '65px', display: 'block', maxWidth: '100%', objectFit: 'contain' }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
