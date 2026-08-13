@@ -29,6 +29,15 @@ export function TabNav({ currentTab, onChangeTab, counts }) {
         <span>Fechados</span>
         <span className="tab-count-chip">{counts.concluidos}</span>
       </button>
+
+      <button
+        className={`tab-button ${currentTab === 'clientes' ? 'active' : ''}`}
+        onClick={() => onChangeTab('clientes')}
+      >
+        <i className="fa-solid fa-building-user"></i>
+        <span>Clientes</span>
+        <span className="tab-count-chip">{counts.clientes || 0}</span>
+      </button>
     </div>
   );
 }

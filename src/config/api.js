@@ -218,6 +218,61 @@ export const apiFetchChamados = async () => {
     return [];
 };
 
+export const apiFetchParceiros = async () => {
+    const token = getToken();
+    if (token === 'demo-token-mock') {
+        return [
+            {
+                id_parceiros: 'p1',
+                nome_principal: 'Cartório Raupp & Associados',
+                nome_secundario: 'Cartório Raupp',
+                doc_principal: '12.345.678/0001-90',
+                end_logradouro: 'Av. Protásio Alves',
+                end_numero: '1234',
+                end_bairro: 'Petrópolis',
+                end_cidade: 'Porto Alegre',
+                end_uf: 'RS',
+                contato1_nome: 'Carlos Silva',
+                contato1_fone: '(51) 99887-6655'
+            },
+            {
+                id_parceiros: 'p2',
+                nome_principal: 'Hospital Central Raupp',
+                nome_secundario: 'Hospital Central',
+                doc_principal: '98.765.432/0001-10',
+                end_logradouro: 'Rua dos Andradas',
+                end_numero: '500',
+                end_bairro: 'Centro Histórico',
+                end_cidade: 'Porto Alegre',
+                end_uf: 'RS',
+                contato1_nome: 'Mariana Costa',
+                contato1_fone: '(51) 98765-4321'
+            }
+        ];
+    }
+
+    try {
+        await ensureAuthSession();
+
+        const { data, error } = await supabase
+            .from('parceiros')
+            .select('*, localizacoes:parceiros_localizacao(*)')
+            .order('nome_principal', { ascending: true });
+
+        if (!error && data) {
+            return data;
+        }
+
+        if (error) {
+            console.error('Erro ao buscar parceiros no Supabase:', error);
+        }
+    } catch (err) {
+        console.warn('Erro ao buscar parceiros:', err);
+    }
+
+    return [];
+};
+
 const VALID_OS_COLUMNS = [
     'id_os_chamados', 'numero_os', 'origem', 'parceiros_id', 'parceiros_localizacao_id',
     'equipamentos_id', 'tipo_chamado', 'status_chamado', 'medidor_atendimento',
