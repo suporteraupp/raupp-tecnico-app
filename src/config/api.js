@@ -141,22 +141,6 @@ export const apiSignUp = async (usuario, password) => {
     let session = data?.session;
     let user = data?.user;
 
-    // Salva ou atualiza os dados do usuário na tabela 'profiles' (perfis)
-    if (user?.id) {
-        try {
-            await supabase.from('profiles').upsert({
-                id_profiles: user.id,
-                nome_completo: cleanUsuario,
-                usuario: cleanUsuario,
-                email_recuperacao: loginEmail,
-                role: 'tecnico',
-                updated_at: new Date().toISOString()
-            });
-        } catch (err) {
-            console.warn('Erro ao salvar dados na tabela profiles:', err);
-        }
-    }
-
     // Tenta efetuar o login automático se o Supabase não retornar a sessão diretamente no signUp
     if (!session) {
         try {
@@ -187,7 +171,7 @@ export const apiSignUp = async (usuario, password) => {
     return {
         success: true,
         needConfirmation: true,
-        message: 'Conta criada no Supabase e salva na tabela de perfis! Se a opção de confirmação de e-mail estiver ativa no seu projeto Supabase, verifique sua caixa de entrada ou desative "Confirm email" no painel para entrar.'
+        message: 'Conta criada no Supabase! Se a opção de confirmação de e-mail estiver ativa no seu projeto Supabase, verifique sua caixa de entrada ou desative "Confirm email" no painel para entrar.'
     };
 };
 
