@@ -81,6 +81,7 @@ export function Login({ onLoginSuccess, showToast }) {
             borderRadius: '10px',
             marginBottom: '20px'
           }}>
+            {/* Botão Entrar */}
             <button
               type="button"
               onClick={() => { setIsRegistering(false); setAuthError(''); }}
