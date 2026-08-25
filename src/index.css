@@ -81,7 +81,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
-  padding-bottom: 90px;
+  padding-bottom: max(90px, env(safe-area-inset-bottom));
   overflow-x: hidden;
   position: relative;
 }
@@ -137,7 +137,7 @@ body {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--card-border);
-  padding: 12px 18px;
+  padding: max(12px, env(safe-area-inset-top)) 18px 12px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -575,3 +575,56 @@ body {
   from { transform: translateY(-100%); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
+
+/* Media Queries para Telas Pequenas (< 380px) */
+@media (max-width: 380px) {
+  .tab-navigation {
+    margin: 8px 10px 12px 10px;
+    padding: 4px;
+  }
+
+  .tab-button {
+    padding: 8px 2px;
+    font-size: 0.72rem;
+    gap: 3px;
+  }
+
+  .tab-button span:not(.tab-count-chip) {
+    font-size: 0.7rem;
+  }
+
+  .header-app-name {
+    font-size: 0.98rem;
+  }
+
+  .logo-img {
+    height: 24px;
+  }
+
+  .os-card {
+    margin: 10px 10px;
+    padding: 12px 12px;
+  }
+
+  .actions-grid {
+    gap: 6px;
+  }
+
+  .btn-expand-toggle {
+    min-height: 32px;
+    padding: 6px 12px !important;
+  }
+}
+
+/* Modais responsivos para telas baixas ou modo paisagem */
+@media (max-height: 650px) {
+  .modal-card {
+    max-height: 96vh;
+    padding: 14px 16px;
+  }
+
+  .signature-canvas-element {
+    height: 120px;
+  }
+}
+

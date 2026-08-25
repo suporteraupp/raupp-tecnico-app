@@ -10,7 +10,7 @@ export function ClientList({ parceiros, loading, selectedCity }) {
 
   const filteredParceiros = parceiros.filter((p) => {
     if (selectedCity) {
-      const cityMatches = (p.end_cidade || '').toLowerCase() === selectedCity.toLowerCase();
+      const cityMatches = (p.end_cidade || '').toLowerCase().includes(selectedCity.toLowerCase());
       if (!cityMatches) return false;
     }
 

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 
 export function SignatureModal({ os: _os, onClose, onSubmit, showToast }) {
   const canvasRef = useRef(null);
@@ -9,16 +9,23 @@ export function SignatureModal({ os: _os, onClose, onSubmit, showToast }) {
   const [hasSignature, setHasSignature] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (canvasRef.current) {
-      resizeCanvas();
-    }
-  }, []);
-
-  const resizeCanvas = () => {
+  const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.parentElement.getBoundingClientRect();
+
+    // Preserva o desenho atual caso o teclado virtual se abra ou a janela seja redimensionada
+    let tempImgData = null;
+    const oldWidth = canvas.width;
+    const oldHeight = canvas.height;
+    if (oldWidth > 0 && oldHeight > 0) {
+      try {
+        tempImgData = canvas.toDataURL('image/png');
+      } catch {
+        tempImgData = null;
+      }
+    }
+
     canvas.width = rect.width;
     canvas.height = 160;
 
@@ -29,8 +36,33 @@ export function SignatureModal({ os: _os, onClose, onSubmit, showToast }) {
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    setHasSignature(false);
-  };
+
+    if (tempImgData && hasSignature) {
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0);
+      };
+      img.src = tempImgData;
+    }
+  }, [hasSignature]);
+
+  useEffect(() => {
+    if (canvasRef.current) {
+      resizeCanvas();
+    }
+
+    const handleResize = () => {
+      if (canvasRef.current && canvasRef.current.parentElement) {
+        const rect = canvasRef.current.parentElement.getBoundingClientRect();
+        if (rect.width > 0 && canvasRef.current.width !== rect.width) {
+          resizeCanvas();
+        }
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [resizeCanvas]);
 
   const getPos = (e) => {
     const canvas = canvasRef.current;
@@ -50,7 +82,6 @@ export function SignatureModal({ os: _os, onClose, onSubmit, showToast }) {
   const handleStart = (e) => {
     e.preventDefault();
     setIsDrawing(true);
-    setHasSignature(true);
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const pos = getPos(e);
@@ -61,6 +92,7 @@ export function SignatureModal({ os: _os, onClose, onSubmit, showToast }) {
   const handleMove = (e) => {
     if (!isDrawing) return;
     e.preventDefault();
+    setHasSignature(true);
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const pos = getPos(e);

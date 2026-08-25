@@ -26,13 +26,13 @@ export function App() {
     setHistoryModalData({ equipamentoId, equipamentoLabel, numeroSerie });
   };
 
-  const showToast = (message, type = 'info') => {
+  const showToast = useCallback((message, type = 'info') => {
     setToast({ message, type });
-  };
+  }, []);
 
-  const closeToast = () => {
+  const closeToast = useCallback(() => {
     setToast({ message: '', type: 'info' });
-  };
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
@@ -51,7 +51,7 @@ export function App() {
       setLoading(false);
       setLoadingParceiros(false);
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     const token = getToken();
@@ -188,7 +188,7 @@ export function App() {
           <div style={{ textAlign: 'center', padding: '50px 20px', color: '#94a3b8' }}>
             <i className="fa-solid fa-spinner fa-spin fa-2x" style={{ color: '#00a2e8' }}></i>
             <p style={{ marginTop: '12px', fontWeight: 500 }}>Carregando Ordens de Serviço...</p>
-          </div>
+          </div>  
         ) : filteredList.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
             <i className="fa-solid fa-folder-open fa-3x" style={{ opacity: 0.5 }}></i>

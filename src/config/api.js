@@ -127,9 +127,12 @@ const ensureAuthSession = async () => {
     try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
+            // Tenta autenticar silenciosamente com conta padrão caso configurada
             await supabase.auth.signInWithPassword({
                 email: 'tecnico@raupp.com.br',
                 password: 'Password123!'
+            }).catch(() => {
+                // Ignora falha de autenticação automática silenciosa
             });
         }
     } catch (e) {
@@ -145,37 +148,101 @@ export const apiLogin = async (usuario, password, forceDemo = false) => {
         return { token: 'demo-token-mock', user: mockUser, isDemo: true };
     }
 
-    const loginEmail = usuario.includes('@') ? usuario : `${usuario}@raupp.com.br`;
+    const cleanUsuario = (usuario || '').trim();
+    const cleanPassword = (password || '').trim();
 
-    let { data, error } = await supabase.auth.signInWithPassword({
-        email: loginEmail,
-        password: password
-    });
-
-    if (error) {
-        const defaultAuth = await supabase.auth.signInWithPassword({
-            email: 'tecnico@raupp.com.br',
-            password: 'Password123!'
-        });
-        if (!defaultAuth.error && defaultAuth.data?.session) {
-            data = defaultAuth.data;
-            error = null;
-        }
+    if (!cleanUsuario || !cleanPassword) {
+        throw new Error('Preencha o usuário/e-mail e a senha.');
     }
 
+    const loginEmail = cleanUsuario.includes('@') ? cleanUsuario : `${cleanUsuario}@raupp.com.br`;
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password: cleanPassword
+    });
+
     if (error || !data?.session) {
-        throw new Error(error?.message || 'E-mail ou senha incorretos no Supabase.');
+        const rawMsg = error?.message || '';
+        let translatedMsg = 'Usuário/E-mail ou senha incorretos.';
+
+        if (/invalid login credentials|invalid email or password/i.test(rawMsg)) {
+            translatedMsg = 'Credenciais incorretas! E-mail/usuário ou senha inválidos no Supabase Auth.';
+        } else if (/email not confirmed/i.test(rawMsg)) {
+            translatedMsg = 'Seu e-mail ainda não foi confirmado no Supabase Auth.';
+        } else if (/user not found/i.test(rawMsg)) {
+            translatedMsg = 'Usuário não encontrado no Supabase Auth.';
+        } else if (/too many requests|rate limit/i.test(rawMsg)) {
+            translatedMsg = 'Muitas tentativas malsucedidas. Por favor, aguarde alguns instantes.';
+        } else if (rawMsg) {
+            translatedMsg = `Erro na autenticação: ${rawMsg}`;
+        }
+
+        const authErr = new Error(translatedMsg);
+        authErr.isAuthError = true;
+        authErr.rawMessage = rawMsg;
+        throw authErr;
     }
 
     const userObj = {
         id: data.user.id,
-        nome: usuario || data.user.user_metadata?.nome || data.user.email?.split('@')[0] || 'Técnico',
+        nome: cleanUsuario || data.user.user_metadata?.nome || data.user.email?.split('@')[0] || 'Técnico',
         email: data.user.email
     };
 
     setToken(data.session.access_token);
     setUser(userObj);
     return { token: data.session.access_token, user: userObj };
+};
+
+export const apiSignUp = async (usuario, password) => {
+    const cleanUsuario = (usuario || '').trim();
+    const cleanPassword = (password || '').trim();
+
+    if (!cleanUsuario || !cleanPassword) {
+        throw new Error('Preencha o usuário/e-mail e a senha para criar a conta.');
+    }
+
+    if (cleanPassword.length < 6) {
+        throw new Error('A senha deve possuir no mínimo 6 caracteres.');
+    }
+
+    const loginEmail = cleanUsuario.includes('@') ? cleanUsuario : `${cleanUsuario}@raupp.com.br`;
+
+    const { data, error } = await supabase.auth.signUp({
+        email: loginEmail,
+        password: cleanPassword,
+        options: {
+            data: { nome: cleanUsuario }
+        }
+    });
+
+    if (error) {
+        const rawMsg = error.message || '';
+        let msg = 'Erro ao cadastrar usuário no Supabase.';
+
+        if (/user already registered|user_already_exists/i.test(rawMsg)) {
+            msg = 'Este usuário/e-mail já está cadastrado. Tente realizar o login.';
+        } else if (/password should be at least/i.test(rawMsg)) {
+            msg = 'A senha deve ter pelo menos 6 caracteres.';
+        } else if (rawMsg) {
+            msg = `Erro no cadastro: ${rawMsg}`;
+        }
+        throw new Error(msg);
+    }
+
+    if (data?.session) {
+        const userObj = {
+            id: data.user.id,
+            nome: cleanUsuario || data.user.user_metadata?.nome || data.user.email?.split('@')[0] || 'Técnico',
+            email: data.user.email
+        };
+        setToken(data.session.access_token);
+        setUser(userObj);
+        return { token: data.session.access_token, user: userObj, isNew: true };
+    }
+
+    return { success: true, needConfirmation: true, message: 'Conta criada! Se a confirmação de e-mail estiver ativa no Supabase, verifique sua caixa de entrada.' };
 };
 
 export const apiFetchChamados = async () => {
@@ -220,6 +287,13 @@ export const apiFetchChamados = async () => {
 
 export const apiFetchHistoricoEquipamento = async (equipamentoId) => {
     if (!equipamentoId) return [];
+
+    const token = getToken();
+    if (token === 'demo-token-mock') {
+        const mockChamados = getMockChamados();
+        return mockChamados.filter(c => c.equipamento?.numero_serie || c.equipamentos_id === equipamentoId);
+    }
+
     try {
         await ensureAuthSession();
         const { data, error } = await supabase
@@ -240,6 +314,7 @@ export const apiFetchHistoricoEquipamento = async (equipamentoId) => {
         const { data: plainData } = await supabase
             .from('os_chamados')
             .select('*')
+            .eq('equipamentos_id', equipamentoId)
             .order('created_at', { ascending: false })
             .limit(10);
 
@@ -342,8 +417,8 @@ export const apiAtualizarStatusChamado = async (id, payload) => {
             cleanPayload.data_fechamento = new Date().toISOString();
         }
 
-        if (payload.contador_pb_atendimento || payload.contador_cor_atendimento) {
-            cleanPayload.medidor_atendimento = payload.contador_pb_atendimento || payload.contador_cor_atendimento;
+        if (payload.contador_pb_atendimento !== undefined || payload.contador_cor_atendimento !== undefined) {
+            cleanPayload.medidor_atendimento = payload.contador_pb_atendimento ?? payload.contador_cor_atendimento;
         }
 
         const { error } = await supabase

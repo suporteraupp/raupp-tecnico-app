@@ -2,11 +2,12 @@ import React, { useEffect } from 'react';
 
 export function Toast({ message, type = 'info', onClose }) {
   useEffect(() => {
+    if (!message) return;
     const timer = setTimeout(() => {
       onClose();
     }, 4000);
     return () => clearTimeout(timer);
-  }, [onClose]);
+  }, [message, onClose]);
 
   if (!message) return null;
 
