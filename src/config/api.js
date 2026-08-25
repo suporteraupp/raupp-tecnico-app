@@ -54,6 +54,15 @@ const ensureAuthSession = async () => {
     }
 };
 
+const formatEmail = (input) => {
+    const clean = (input || '').trim();
+    if (!clean) return '';
+    if (clean.includes('@')) return clean.toLowerCase();
+    // Normaliza acentos (ex: João -> joao) e converte para minúsculas
+    const normalized = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    return `${normalized}@raupp.com.br`;
+};
+
 export const apiLogin = async (usuario, password) => {
     const cleanUsuario = (usuario || '').trim();
     const cleanPassword = (password || '').trim();
@@ -62,7 +71,7 @@ export const apiLogin = async (usuario, password) => {
         throw new Error('Preencha o usuário/e-mail e a senha.');
     }
 
-    const loginEmail = cleanUsuario.includes('@') ? cleanUsuario : `${cleanUsuario}@raupp.com.br`;
+    const loginEmail = formatEmail(cleanUsuario);
 
     const { data, error } = await supabase.auth.signInWithPassword({
         email: loginEmail,
@@ -76,7 +85,7 @@ export const apiLogin = async (usuario, password) => {
         if (/invalid login credentials|invalid email or password/i.test(rawMsg)) {
             translatedMsg = 'Credenciais incorretas! E-mail/usuário ou senha inválidos no Supabase Auth.';
         } else if (/email not confirmed/i.test(rawMsg)) {
-            translatedMsg = 'Seu e-mail ainda não foi confirmado no Supabase Auth.';
+            translatedMsg = 'Seu e-mail ainda não foi confirmado no Supabase Auth. Verifique a caixa de entrada ou desative "Confirm email" no painel do Supabase.';
         } else if (/user not found/i.test(rawMsg)) {
             translatedMsg = 'Usuário não encontrado no Supabase Auth.';
         } else if (/too many requests|rate limit/i.test(rawMsg)) {
@@ -114,7 +123,7 @@ export const apiSignUp = async (usuario, password) => {
         throw new Error('A senha deve possuir no mínimo 6 caracteres.');
     }
 
-    const loginEmail = cleanUsuario.includes('@') ? cleanUsuario : `${cleanUsuario}@raupp.com.br`;
+    const loginEmail = formatEmail(cleanUsuario);
 
     const { data, error } = await supabase.auth.signUp({
         email: loginEmail,
