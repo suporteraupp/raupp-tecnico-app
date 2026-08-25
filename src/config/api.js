@@ -37,92 +37,6 @@ export const getAuthHeaders = () => {
     };
 };
 
-// Dados Mock de Fallback (Demonstração / Offline)
-const INITIAL_MOCK_CHAMADOS = [
-    {
-        id_os_chamados: 'OS-1001',
-        status_chamado: 'aberto',
-        prioridade: 'Alta',
-        solicitante_nome: 'Carlos Silva',
-        solicitante_telefone: '(51) 99887-6655',
-        descricao_problema: 'Impressora apresentando atolamento constante no disco alimentador e mensagem de erro E-04 no painel.',
-        parceiro: {
-            nome_principal: 'Cartório Raupp & Associados',
-            end_logradouro: 'Av. Protásio Alves',
-            end_numero: '1234',
-            end_bairro: 'Petrópolis',
-            end_cidade: 'Porto Alegre - RS'
-        },
-        equipamento: {
-            tipo_equipamento: 'Multifuncional Laser',
-            numero_serie: 'MX-4589201',
-            marca: { nome_marca: 'Kyocera' },
-            modelo: { nome_modelo: 'ECOSYS M3655idn' }
-        }
-    },
-    {
-        id_os_chamados: 'OS-1002',
-        status_chamado: 'em_atendimento',
-        prioridade: 'Urgente',
-        solicitante_nome: 'Mariana Costa',
-        solicitante_telefone: '(51) 98765-4321',
-        descricao_problema: 'Troca de toner preto e substituição da unidade de fusão desgastada.',
-        laudo_tecnico: 'Equipamento aberto. Limpeza interna efetuada. Fusor novo em processo de instalação.',
-        parceiro: {
-            nome_principal: 'Hospital Central Raupp',
-            end_logradouro: 'Rua dos Andradas',
-            end_numero: '500',
-            end_bairro: 'Centro Histórico',
-            end_cidade: 'Porto Alegre - RS'
-        },
-        equipamento: {
-            tipo_equipamento: 'Impressora Corporativa',
-            numero_serie: 'EP-998124',
-            marca: { nome_marca: 'Epson' },
-            modelo: { nome_modelo: 'WorkForce Pro WF-C579R' }
-        }
-    },
-    {
-        id_os_chamados: 'OS-1003',
-        status_chamado: 'concluido',
-        prioridade: 'Normal',
-        solicitante_nome: 'Roberto Almeida',
-        solicitante_telefone: '(51) 99112-2334',
-        descricao_problema: 'Manutenção preventiva semestral e calibração de cores.',
-        laudo_tecnico: 'Manutenção preventiva realizada com sucesso. Teste de impressão OK. Coletada assinatura do cliente.',
-        parceiro: {
-            nome_principal: 'Escritório de Advocacia Silva',
-            end_logradouro: 'Rua Fernando Machado',
-            end_numero: '300',
-            end_bairro: 'Centro',
-            end_cidade: 'Porto Alegre - RS'
-        },
-        equipamento: {
-            tipo_equipamento: 'Multifuncional Colorida',
-            numero_serie: 'RIC-332190',
-            marca: { nome_marca: 'Ricoh' },
-            modelo: { nome_modelo: 'IM C3000' }
-        }
-    }
-];
-
-const getMockChamados = () => {
-    try {
-        const stored = localStorage.getItem('raupp_mock_chamados');
-        if (!stored) {
-            localStorage.setItem('raupp_mock_chamados', JSON.stringify(INITIAL_MOCK_CHAMADOS));
-            return INITIAL_MOCK_CHAMADOS;
-        }
-        return JSON.parse(stored);
-    } catch {
-        return INITIAL_MOCK_CHAMADOS;
-    }
-};
-
-const saveMockChamados = (list) => {
-    localStorage.setItem('raupp_mock_chamados', JSON.stringify(list));
-};
-
 const ensureAuthSession = async () => {
     try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -140,14 +54,7 @@ const ensureAuthSession = async () => {
     }
 };
 
-export const apiLogin = async (usuario, password, forceDemo = false) => {
-    if (forceDemo) {
-        const mockUser = { id: 'tech-01', nome: usuario || 'Técnico Raupp', usuario: usuario || 'tecnico', isDemo: true };
-        setToken('demo-token-mock');
-        setUser(mockUser);
-        return { token: 'demo-token-mock', user: mockUser, isDemo: true };
-    }
-
+export const apiLogin = async (usuario, password) => {
     const cleanUsuario = (usuario || '').trim();
     const cleanPassword = (password || '').trim();
 
@@ -246,11 +153,6 @@ export const apiSignUp = async (usuario, password) => {
 };
 
 export const apiFetchChamados = async () => {
-    const token = getToken();
-    if (token === 'demo-token-mock') {
-        return getMockChamados();
-    }
-
     try {
         await ensureAuthSession();
 
@@ -288,12 +190,6 @@ export const apiFetchChamados = async () => {
 export const apiFetchHistoricoEquipamento = async (equipamentoId) => {
     if (!equipamentoId) return [];
 
-    const token = getToken();
-    if (token === 'demo-token-mock') {
-        const mockChamados = getMockChamados();
-        return mockChamados.filter(c => c.equipamento?.numero_serie || c.equipamentos_id === equipamentoId);
-    }
-
     try {
         await ensureAuthSession();
         const { data, error } = await supabase
@@ -326,38 +222,6 @@ export const apiFetchHistoricoEquipamento = async (equipamentoId) => {
 };
 
 export const apiFetchParceiros = async () => {
-    const token = getToken();
-    if (token === 'demo-token-mock') {
-        return [
-            {
-                id_parceiros: 'p1',
-                nome_principal: 'Cartório Raupp & Associados',
-                nome_secundario: 'Cartório Raupp',
-                doc_principal: '12.345.678/0001-90',
-                end_logradouro: 'Av. Protásio Alves',
-                end_numero: '1234',
-                end_bairro: 'Petrópolis',
-                end_cidade: 'Porto Alegre',
-                end_uf: 'RS',
-                contato1_nome: 'Carlos Silva',
-                contato1_fone: '(51) 99887-6655'
-            },
-            {
-                id_parceiros: 'p2',
-                nome_principal: 'Hospital Central Raupp',
-                nome_secundario: 'Hospital Central',
-                doc_principal: '98.765.432/0001-10',
-                end_logradouro: 'Rua dos Andradas',
-                end_numero: '500',
-                end_bairro: 'Centro Histórico',
-                end_cidade: 'Porto Alegre',
-                end_uf: 'RS',
-                contato1_nome: 'Mariana Costa',
-                contato1_fone: '(51) 98765-4321'
-            }
-        ];
-    }
-
     try {
         await ensureAuthSession();
 
@@ -390,19 +254,6 @@ const VALID_OS_COLUMNS = [
 ];
 
 export const apiAtualizarStatusChamado = async (id, payload) => {
-    const token = getToken();
-    if (token === 'demo-token-mock') {
-        const list = getMockChamados();
-        const updatedList = list.map(item => {
-            if (item.id_os_chamados === id) {
-                return { ...item, ...payload };
-            }
-            return item;
-        });
-        saveMockChamados(updatedList);
-        return { success: true, isDemo: true };
-    }
-
     try {
         await ensureAuthSession();
 

@@ -33,55 +33,13 @@ export function Login({ onLoginSuccess, showToast }) {
         const data = await apiLogin(usuario.trim(), password.trim());
         setToken(data.token);
         setUser(data.user);
-        if (data.wasFallback) {
-          showToast('Servidor API offline. Conectado em Modo Demonstração!', 'info');
-        } else {
-          showToast(`Bem-vindo, ${data.user.nome}!`, 'success');
-        }
+        showToast(`Bem-vindo, ${data.user.nome}!`, 'success');
         onLoginSuccess(data.user);
       }
     } catch (err) {
       const errorMsg = err.message || 'Erro ao processar autenticação.';
       setAuthError(errorMsg);
       showToast(errorMsg, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleQuickRegister = async () => {
-    if (!usuario.trim() || !password.trim()) {
-      setIsRegistering(true);
-      showToast('Preencha um usuário e senha para cadastrar.', 'warning');
-      return;
-    }
-    try {
-      setLoading(true);
-      setAuthError('');
-      const res = await apiSignUp(usuario.trim(), password.trim());
-      if (res.isNew) {
-        showToast(`Conta cadastrada com sucesso! Bem-vindo, ${res.user.nome}!`, 'success');
-        onLoginSuccess(res.user);
-      } else {
-        showToast(res.message, 'info');
-      }
-    } catch (err) {
-      setAuthError(err.message || 'Erro ao criar conta no Supabase.');
-      showToast(err.message || 'Erro ao criar conta.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDemoLogin = async () => {
-    try {
-      setLoading(true);
-      setAuthError('');
-      const data = await apiLogin(usuario.trim() || 'Técnico Raupp', '', true);
-      showToast('Entrou no Modo Demonstração (Sem Backend)!', 'info');
-      onLoginSuccess(data.user);
-    } catch {
-      showToast('Erro ao iniciar modo demonstração.', 'error');
     } finally {
       setLoading(false);
     }
@@ -160,77 +118,6 @@ export function Login({ onLoginSuccess, showToast }) {
               <i className="fa-solid fa-user-plus" style={{ marginRight: '6px' }}></i> Criar Conta
             </button>
           </div>
-
-          {authError && (
-            <div style={{
-              background: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              borderRadius: '12px',
-              padding: '14px 16px',
-              marginBottom: '20px',
-              color: '#fca5a5',
-              fontSize: '0.86rem',
-              lineHeight: '1.4'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                <i className="fa-solid fa-circle-exclamation" style={{ color: '#ef4444', fontSize: '1.1rem', marginTop: '2px' }}></i>
-                <div>
-                  <strong style={{ color: '#f8fafc', display: 'block', marginBottom: '2px' }}>Aviso de Autenticação</strong>
-                  {authError}
-                </div>
-              </div>
-              <div style={{
-                marginTop: '12px',
-                paddingTop: '10px',
-                borderTop: '1px dashed rgba(239, 68, 68, 0.2)',
-                display: 'flex',
-                gap: '8px',
-                flexWrap: 'wrap',
-                justifyContent: 'flex-end'
-              }}>
-                <button
-                  type="button"
-                  onClick={handleQuickRegister}
-                  style={{
-                    background: 'rgba(16, 185, 129, 0.2)',
-                    border: '1px solid rgba(16, 185, 129, 0.4)',
-                    color: '#6ee7b7',
-                    padding: '6px 12px',
-                    borderRadius: '8px',
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontWeight: 600
-                  }}
-                >
-                  <i className="fa-solid fa-user-plus"></i>
-                  Cadastrar esta Conta no Supabase
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDemoLogin}
-                  style={{
-                    background: 'rgba(56, 189, 248, 0.15)',
-                    border: '1px solid rgba(56, 189, 248, 0.3)',
-                    color: '#38bdf8',
-                    padding: '6px 12px',
-                    borderRadius: '8px',
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontWeight: 600
-                  }}
-                >
-                  <i className="fa-solid fa-bolt"></i>
-                  Modo Demonstração
-                </button>
-              </div>
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="form-group-field">
@@ -325,23 +212,6 @@ export function Login({ onLoginSuccess, showToast }) {
                   <i className="fa-solid fa-right-to-bracket"></i> Acessar Painel Técnico
                 </>
               )}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDemoLogin}
-              className="btn-mobile"
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '12px',
-                fontSize: '0.9rem',
-                background: 'rgba(56, 189, 248, 0.1)',
-                color: '#38bdf8',
-                border: '1px dashed rgba(56, 189, 248, 0.4)'
-              }}
-            >
-              <i className="fa-solid fa-bolt"></i> Entrar em Modo Demonstração (Offline)
             </button>
           </form>
 
