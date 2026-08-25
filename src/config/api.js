@@ -40,17 +40,10 @@ export const getAuthHeaders = () => {
 const ensureAuthSession = async () => {
     try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-            // Tenta autenticar silenciosamente com conta padrão caso configurada
-            await supabase.auth.signInWithPassword({
-                email: 'tecnico@raupp.com.br',
-                password: 'Password123!'
-            }).catch(() => {
-                // Ignora falha de autenticação automática silenciosa
-            });
-        }
+        return session;
     } catch (e) {
-        console.warn('Erro ao assegurar sessão Supabase:', e);
+        console.warn('Erro ao verificar sessão Supabase:', e);
+        return null;
     }
 };
 
