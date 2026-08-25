@@ -138,18 +138,41 @@ export const apiSignUp = async (usuario, password) => {
         throw new Error(msg);
     }
 
-    if (data?.session) {
-        const userObj = {
-            id: data.user.id,
-            nome: cleanUsuario || data.user.user_metadata?.nome || data.user.email?.split('@')[0] || 'Técnico',
-            email: data.user.email
-        };
-        setToken(data.session.access_token);
-        setUser(userObj);
-        return { token: data.session.access_token, user: userObj, isNew: true };
+    let session = data?.session;
+    let user = data?.user;
+
+    // Tenta efetuar o login automático se o Supabase não retornar a sessão diretamente no signUp
+    if (!session) {
+        try {
+            const { data: loginData } = await supabase.auth.signInWithPassword({
+                email: loginEmail,
+                password: cleanPassword
+            });
+            if (loginData?.session) {
+                session = loginData.session;
+                user = loginData.user;
+            }
+        } catch {
+            // Ignora falha de auto-login e avisa sobre necessidade de confirmação
+        }
     }
 
-    return { success: true, needConfirmation: true, message: 'Conta criada! Se a confirmação de e-mail estiver ativa no Supabase, verifique sua caixa de entrada.' };
+    if (session && user) {
+        const userObj = {
+            id: user.id,
+            nome: cleanUsuario || user.user_metadata?.nome || user.email?.split('@')[0] || 'Técnico',
+            email: user.email
+        };
+        setToken(session.access_token);
+        setUser(userObj);
+        return { token: session.access_token, user: userObj, isNew: true };
+    }
+
+    return {
+        success: true,
+        needConfirmation: true,
+        message: 'Conta criada no Supabase! Se a opção de confirmação de e-mail estiver ativa no seu projeto Supabase, verifique sua caixa de entrada ou desative "Confirm email" no painel para entrar.'
+    };
 };
 
 export const apiFetchChamados = async () => {
