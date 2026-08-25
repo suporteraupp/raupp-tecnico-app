@@ -150,6 +150,22 @@ export const apiSignUp = async (usuario, password) => {
     let session = data?.session;
     let user = data?.user;
 
+    // Salva/atualiza os dados do novo usuário na tabela 'profiles' (perfis)
+    if (user?.id) {
+        try {
+            await supabase.from('profiles').upsert({
+                id_profiles: user.id,
+                nome_completo: cleanUsuario,
+                usuario: cleanUsuario,
+                email_recuperacao: loginEmail,
+                role: 'tecnico',
+                updated_at: new Date().toISOString()
+            });
+        } catch (err) {
+            console.warn('Erro ao salvar na tabela profiles:', err);
+        }
+    }
+
     // Tenta efetuar o login automático se o Supabase não retornar a sessão diretamente no signUp
     if (!session) {
         try {
