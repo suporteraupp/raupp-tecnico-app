@@ -38,6 +38,22 @@ export function TabNav({ currentTab, onChangeTab, counts }) {
         <span>Clientes</span>
         <span className="tab-count-chip">{counts.clientes || 0}</span>
       </button>
+
+      <button
+        className={`tab-button ${currentTab === 'maleta' ? 'active' : ''}`}
+        onClick={() => onChangeTab('maleta')}
+        style={{
+          borderColor: currentTab === 'maleta' ? '#00a2e8' : undefined
+        }}
+      >
+        <i className="fa-solid fa-briefcase" style={{ color: currentTab === 'maleta' ? '#38bdf8' : '#00a2e8' }}></i>
+        <span>Maleta</span>
+        {counts.maletaAlertas > 0 ? (
+          <span className="tab-count-chip" style={{ background: '#ef4444', color: '#fff' }}>{counts.maletaAlertas}</span>
+        ) : (
+          <span className="tab-count-chip" style={{ background: 'rgba(0, 162, 232, 0.2)', color: '#38bdf8' }}>{counts.maletaTotal || 0}</span>
+        )}
+      </button>
     </div>
   );
 }

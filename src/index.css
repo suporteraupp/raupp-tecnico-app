@@ -214,15 +214,21 @@ body {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   display: flex;
   gap: 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.tab-navigation::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-button {
-  flex: 1;
-  padding: 10px 4px;
+  flex: 1 0 auto;
+  padding: 9px 10px;
   border: none;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
   border-radius: 12px;
   cursor: pointer;
@@ -233,6 +239,7 @@ body {
   gap: 5px;
   font-family: inherit;
   position: relative;
+  white-space: nowrap;
 }
 
 .tab-button:hover {
@@ -627,4 +634,105 @@ body {
     height: 120px;
   }
 }
+
+/* System Responsiveness - Maleta do Técnico */
+.maleta-wrapper {
+  padding: 0 16px 30px 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.maleta-banner {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.9) 100%);
+  border-radius: 18px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+}
+
+.maleta-banner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.maleta-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.maleta-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.maleta-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.form-row-responsive {
+  display: flex;
+  gap: 10px;
+}
+
+.form-row-responsive > div {
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .maleta-wrapper {
+    padding: 0 10px 24px 10px;
+  }
+
+  .maleta-banner {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .maleta-banner-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .maleta-banner-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .maleta-banner-actions .btn-mobile {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+    padding: 8px 6px;
+    font-size: 0.78rem;
+  }
+
+  .maleta-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .maleta-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .form-row-responsive {
+    flex-direction: column;
+    gap: 0;
+  }
+}
+
 

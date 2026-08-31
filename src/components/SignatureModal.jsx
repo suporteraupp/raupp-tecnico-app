@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { getEstoqueVolante, darBaixaPecasOS } from '../config/estoqueApi';
 
-export function SignatureModal({ os: _os, onClose, onSubmit, showToast }) {
+export function SignatureModal({ os, onClose, onSubmit, showToast }) {
   const canvasRef = useRef(null);
   const [laudo, setLaudo] = useState('');
   const [contadorPb, setContadorPb] = useState('');
@@ -9,12 +10,65 @@ export function SignatureModal({ os: _os, onClose, onSubmit, showToast }) {
   const [hasSignature, setHasSignature] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Estados para Peças da Maleta
+  const [estoqueVolante, setEstoqueVolante] = useState([]);
+  const [selectedPecaId, setSelectedPecaId] = useState('');
+  const [qtdPecaUsada, setQtdPecaUsada] = useState('1');
+  const [pecasUtilizadas, setPecasUtilizadas] = useState([]);
+
+  useEffect(() => {
+    // Carrega peças disponíveis na maleta do técnico
+    const items = getEstoqueVolante();
+    setEstoqueVolante(items.filter(i => i.quantidade > 0));
+  }, []);
+
+  const handleAddPecaOS = () => {
+    if (!selectedPecaId) {
+      showToast('Selecione uma peça da maleta.', 'warning');
+      return;
+    }
+
+    const pecaObj = estoqueVolante.find(p => p.id === selectedPecaId);
+    if (!pecaObj) return;
+
+    const qtd = parseInt(qtdPecaUsada) || 1;
+    if (qtd > pecaObj.quantidade) {
+      showToast(`Você possui apenas ${pecaObj.quantidade} unidades de ${pecaObj.nome} na maleta.`, 'warning');
+      return;
+    }
+
+    // Se já estiver na lista, apenas soma a quantidade
+    const idx = pecasUtilizadas.findIndex(p => p.id === selectedPecaId);
+    if (idx !== -1) {
+      const novasList = [...pecasUtilizadas];
+      novasList[idx].qtdUtilizada += qtd;
+      setPecasUtilizadas(novasList);
+    } else {
+      setPecasUtilizadas([
+        ...pecasUtilizadas,
+        {
+          id: pecaObj.id,
+          nome: pecaObj.nome,
+          codigo: pecaObj.codigo,
+          qtdUtilizada: qtd
+        }
+      ]);
+    }
+
+    setSelectedPecaId('');
+    setQtdPecaUsada('1');
+    showToast(`Peça "${pecaObj.nome}" adicionada à Ordem de Serviço!`, 'info');
+  };
+
+  const handleRemovePecaOS = (id) => {
+    setPecasUtilizadas(pecasUtilizadas.filter(p => p.id !== id));
+  };
+
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.parentElement.getBoundingClientRect();
 
-    // Preserva o desenho atual caso o teclado virtual se abra ou a janela seja redimensionada
     let tempImgData = null;
     const oldWidth = canvas.width;
     const oldHeight = canvas.height;
@@ -129,7 +183,22 @@ export function SignatureModal({ os: _os, onClose, onSubmit, showToast }) {
 
     try {
       setLoading(true);
-      const laudoCompleto = `${laudo.trim()}\n---ASSINATURA---\n${signatureBase64}`;
+
+      // Formata lista de peças no laudo técnico
+      let resumoPecasText = '';
+      if (pecasUtilizadas.length > 0) {
+        resumoPecasText = '\n--- PEÇAS UTILIZADAS (ESTOQUE VOLANTE) ---\n' +
+          pecasUtilizadas.map(p => `- ${p.qtdUtilizada}x ${p.nome} [${p.codigo}]`).join('\n');
+      }
+
+      const laudoCompleto = `${laudo.trim()}${resumoPecasText}\n---ASSINATURA---\n${signatureBase64}`;
+
+      // Dá baixa automática no estoque volante
+      if (pecasUtilizadas.length > 0) {
+        const clienteNome = os.parceiro?.nome_principal || os.solicitante_nome || 'Cliente';
+        darBaixaPecasOS(os.numero_os, clienteNome, pecasUtilizadas);
+      }
+
       await onSubmit({
         status_chamado: 'concluido',
         laudo_tecnico: laudoCompleto,
@@ -145,7 +214,7 @@ export function SignatureModal({ os: _os, onClose, onSubmit, showToast }) {
 
   return (
     <div className="modal-backdrop">
-      <div className="modal-card">
+      <div className="modal-card" style={{ maxWidth: '540px' }}>
         <div className="modal-title-row">
           <h3 className="modal-title">
             <i className="fa-solid fa-signature" style={{ color: '#60a5fa', marginRight: '8px' }}></i>
@@ -160,15 +229,92 @@ export function SignatureModal({ os: _os, onClose, onSubmit, showToast }) {
             <textarea
               className="input-styled"
               rows="3"
-              placeholder="Descreva testes executados, peças trocadas e solução..."
+              placeholder="Descreva testes executados, causa do defeito e solução..."
               value={laudo}
               onChange={(e) => setLaudo(e.target.value)}
               required
             ></textarea>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <div className="form-group-field" style={{ flex: 1 }}>
+          {/* Seção de Peças & Consumíveis do Estoque Volante */}
+          <div className="form-group-field" style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+            <label className="form-label-styled" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <i className="fa-solid fa-briefcase" style={{ color: '#00a2e8' }}></i>
+              Peças Utilizadas (Estoque Volante do Carro)
+            </label>
+
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+              <select
+                className="input-styled"
+                style={{ flex: '3 1 180px', fontSize: '0.8rem' }}
+                value={selectedPecaId}
+                onChange={(e) => setSelectedPecaId(e.target.value)}
+              >
+                <option value="">-- Selecionar Peça da Maleta --</option>
+                {estoqueVolante.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome} (Disp: {p.quantidade} {p.unidade})
+                  </option>
+                ))}
+              </select>
+
+              <div style={{ display: 'flex', gap: '6px', flex: '1 1 100px' }}>
+                <input
+                  type="number"
+                  className="input-styled"
+                  style={{ flex: 1, textAlign: 'center', fontSize: '0.8rem' }}
+                  value={qtdPecaUsada}
+                  onChange={(e) => setQtdPecaUsada(e.target.value)}
+                  min="1"
+                />
+
+                <button
+                  type="button"
+                  className="btn-mobile"
+                  onClick={handleAddPecaOS}
+                  style={{ background: '#00a2e8', color: '#fff', padding: '0 14px' }}
+                  title="Adicionar à OS"
+                >
+                  <i className="fa-solid fa-plus"></i>
+                </button>
+              </div>
+            </div>
+
+            {/* Lista de Peças Selecionadas */}
+            {pecasUtilizadas.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>
+                {pecasUtilizadas.map(p => (
+                  <div
+                    key={p.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: 'rgba(0, 162, 232, 0.12)',
+                      border: '1px solid rgba(0, 162, 232, 0.25)',
+                      padding: '6px 10px',
+                      borderRadius: '8px',
+                      fontSize: '0.78rem'
+                    }}
+                  >
+                    <span style={{ color: '#f8fafc', fontWeight: '600' }}>
+                      {p.qtdUtilizada}x {p.nome} <span style={{ color: '#94a3b8', fontSize: '0.7rem' }}>[{p.codigo}]</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePecaOS(p.id)}
+                      style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer' }}
+                    >
+                      <i className="fa-solid fa-trash-can"></i>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="form-row-responsive">
+            <div className="form-group-field">
               <label className="form-label-styled">Contador P&B Atual</label>
               <input
                 type="number"
@@ -178,7 +324,7 @@ export function SignatureModal({ os: _os, onClose, onSubmit, showToast }) {
                 onChange={(e) => setContadorPb(e.target.value)}
               />
             </div>
-            <div className="form-group-field" style={{ flex: 1 }}>
+            <div className="form-group-field">
               <label className="form-label-styled">Contador Color Atual</label>
               <input
                 type="number"

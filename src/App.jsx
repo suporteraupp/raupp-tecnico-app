@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getToken, getUser, apiFetchChamados, apiFetchParceiros, apiAtualizarStatusChamado, removeToken } from './config/api';
+import { getEstoqueVolante } from './config/estoqueApi';
 import { Login } from './components/Login';
 import { Header } from './components/Header';
 import { TabNav } from './components/TabNav';
 import { OsCard } from './components/OsCard';
 import { ClientList } from './components/ClientList';
 import { CityFilter } from './components/CityFilter';
+import { TechMaleta } from './components/TechMaleta';
 import { SignatureModal } from './components/SignatureModal';
 import { EquipmentHistoryModal } from './components/EquipmentHistoryModal';
 import { Toast } from './components/Toast';
@@ -21,6 +23,19 @@ export function App() {
   const [activeOsForSignature, setActiveOsForSignature] = useState(null);
   const [historyModalData, setHistoryModalData] = useState(null);
   const [toast, setToast] = useState({ message: '', type: 'info' });
+
+  // Métricas do Estoque Volante
+  const [maletaMetrics, setMaletaMetrics] = useState({ total: 0, alertas: 0 });
+
+  const updateMaletaMetrics = useCallback(() => {
+    try {
+      const items = getEstoqueVolante();
+      const alertas = items.filter(i => i.quantidade <= i.qtdMinima).length;
+      setMaletaMetrics({ total: items.length, alertas });
+    } catch {
+      setMaletaMetrics({ total: 0, alertas: 0 });
+    }
+  }, []);
 
   const handleOpenHistory = (equipamentoId, equipamentoLabel, numeroSerie) => {
     setHistoryModalData({ equipamentoId, equipamentoLabel, numeroSerie });
@@ -44,6 +59,7 @@ export function App() {
       ]);
       setChamados(chamadosData);
       setParceiros(parceirosData);
+      updateMaletaMetrics();
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
       showToast(err.message || 'Erro ao carregar dados.', 'error');
@@ -51,7 +67,7 @@ export function App() {
       setLoading(false);
       setLoadingParceiros(false);
     }
-  }, [showToast]);
+  }, [showToast, updateMaletaMetrics]);
 
   useEffect(() => {
     const token = getToken();
@@ -92,10 +108,11 @@ export function App() {
     if (!activeOsForSignature) return;
     try {
       await apiAtualizarStatusChamado(activeOsForSignature.id_os_chamados, payload);
-      showToast('Ordem de Serviço concluída com Assinatura Digital!', 'success');
+      showToast('Ordem de Serviço concluída com Assinatura Digital e Baixa de Peças!', 'success');
       setActiveOsForSignature(null);
       setCurrentTab('concluido');
       loadData();
+      updateMaletaMetrics();
     } catch (err) {
       showToast(err.message || 'Erro ao concluir Ordem de Serviço.', 'error');
       throw err;
@@ -232,12 +249,14 @@ export function App() {
           abertos: abertos.length,
           emCurso: emCurso.length,
           concluidos: concluidos.length,
-          clientes: filteredByCityParceiros.length
+          clientes: filteredByCityParceiros.length,
+          maletaTotal: maletaMetrics.total,
+          maletaAlertas: maletaMetrics.alertas
         }}
       />
 
-      {/* Componente de Filtro por Cidade */}
-      {!loading && (
+      {/* Componente de Filtro por Cidade (somente visível nas abas de chamados e clientes) */}
+      {!loading && currentTab !== 'maleta' && (
         <CityFilter
           selectedCity={selectedCity}
           onSelectCity={setSelectedCity}
@@ -246,7 +265,9 @@ export function App() {
       )}
 
       <main style={{ minHeight: '300px', position: 'relative', zIndex: 10 }}>
-        {currentTab === 'clientes' ? (
+        {currentTab === 'maleta' ? (
+          <TechMaleta showToast={showToast} />
+        ) : currentTab === 'clientes' ? (
           <ClientList parceiros={parceiros} loading={loadingParceiros} selectedCity={selectedCity} />
         ) : loading ? (
           <div style={{ textAlign: 'center', padding: '50px 20px', color: '#94a3b8' }}>
