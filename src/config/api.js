@@ -197,30 +197,62 @@ export const apiFetchChamados = async () => {
     try {
         await ensureAuthSession();
 
+        // 1. Tenta a query de join primária
         const { data, error } = await supabase
             .from('os_chamados')
             .select('*, parceiro:parceiros!parceiros_id(*), parceiro_localizacao:parceiros_localizacao!parceiros_localizacao_id(*), equipamento:equipamentos!equipamentos_id(*)');
 
-        if (!error && data) {
+        if (!error && data && data.length > 0 && data[0].parceiro) {
             return data;
         }
 
         if (error) {
-            console.warn('Supabase join error, tentando select simples:', error);
+            console.warn('Erro na query primária de os_chamados, tentando query secundária:', error);
         }
 
-        // Fallback simples sem relacionamentos
-        const { data: plainData, error: plainError } = await supabase
+        // 2. Tenta query de join secundária sem FKs explícitas
+        const { data: dataAlt, error: errAlt } = await supabase
             .from('os_chamados')
-            .select('*');
+            .select('*, parceiro:parceiros(*), parceiro_localizacao:parceiros_localizacao(*), equipamento:equipamentos(*)');
 
-        if (!plainError && plainData) {
-            return plainData;
+        if (!errAlt && dataAlt && dataAlt.length > 0 && dataAlt[0].parceiro) {
+            return dataAlt;
         }
 
-        if (plainError) {
-            console.error('Erro ao buscar os_chamados no Supabase:', plainError);
-        }
+        // 3. Fallback Infalível: Busca todas as tabelas em paralelo e une em memória
+        console.warn('Executando fallback manual de junção para os_chamados...');
+        const [osRes, parcRes, locRes, eqRes] = await Promise.all([
+            supabase.from('os_chamados').select('*'),
+            supabase.from('parceiros').select('*'),
+            supabase.from('parceiros_localizacao').select('*'),
+            supabase.from('equipamentos').select('*')
+        ]);
+
+        const osList = osRes.data || [];
+        const parceirosMap = {};
+        (parcRes.data || []).forEach(p => {
+            const pId = p.id_parceiros || p.id;
+            if (pId) parceirosMap[pId] = p;
+        });
+
+        const locsMap = {};
+        (locRes.data || []).forEach(l => {
+            const lId = l.id_parceiros_localizacao || l.id_parceiro_localizacao || l.id;
+            if (lId) locsMap[lId] = l;
+        });
+
+        const eqMap = {};
+        (eqRes.data || []).forEach(e => {
+            const eId = e.id_equipamentos || e.id;
+            if (eId) eqMap[eId] = e;
+        });
+
+        return osList.map(os => ({
+            ...os,
+            parceiro: os.parceiro || parceirosMap[os.parceiros_id || os.parceiro_id] || null,
+            parceiro_localizacao: os.parceiro_localizacao || locsMap[os.parceiros_localizacao_id || os.parceiro_localizacao_id] || null,
+            equipamento: os.equipamento || eqMap[os.equipamentos_id || os.equipamento_id] || null
+        }));
     } catch (err) {
         console.warn('Erro ao buscar chamados no Supabase:', err);
     }
@@ -244,10 +276,6 @@ export const apiFetchHistoricoEquipamento = async (equipamentoId) => {
             return data;
         }
 
-        if (error) {
-            console.warn('Erro ao buscar histórico por equipamentos_id, tentando query alternativa:', error);
-        }
-
         const { data: plainData } = await supabase
             .from('os_chamados')
             .select('*')
@@ -266,18 +294,57 @@ export const apiFetchParceiros = async () => {
     try {
         await ensureAuthSession();
 
+        // 1. Tenta a query de join primária
         const { data, error } = await supabase
             .from('parceiros')
             .select('*, localizacoes:parceiros_localizacao(*)')
             .order('nome_principal', { ascending: true });
 
-        if (!error && data) {
+        if (!error && data && data.length > 0) {
             return data;
         }
 
         if (error) {
-            console.error('Erro ao buscar parceiros no Supabase:', error);
+            console.warn('Erro na query de join de parceiros, tentando query sem alias:', error);
         }
+
+        // 2. Tenta a query de join sem alias 'localizacoes:'
+        const { data: dataAlt, error: errAlt } = await supabase
+            .from('parceiros')
+            .select('*, parceiros_localizacao(*)')
+            .order('nome_principal', { ascending: true });
+
+        if (!errAlt && dataAlt && dataAlt.length > 0) {
+            return dataAlt.map(p => ({
+                ...p,
+                localizacoes: p.localizacoes || p.parceiros_localizacao || []
+            }));
+        }
+
+        // 3. Fallback Infalível: Busca parceiros e parceiros_localizacao em paralelo e agrupa em JS
+        console.warn('Executando fallback manual de junção para parceiros e localizações...');
+        const [parcRes, locRes] = await Promise.all([
+            supabase.from('parceiros').select('*').order('nome_principal', { ascending: true }),
+            supabase.from('parceiros_localizacao').select('*')
+        ]);
+
+        const parceirosList = parcRes.data || [];
+        const locsGrouped = {};
+        (locRes.data || []).forEach(l => {
+            const pId = l.parceiros_id || l.id_parceiros || l.parceiro_id;
+            if (pId) {
+                if (!locsGrouped[pId]) locsGrouped[pId] = [];
+                locsGrouped[pId].push(l);
+            }
+        });
+
+        return parceirosList.map(p => {
+            const pId = p.id_parceiros || p.id;
+            return {
+                ...p,
+                localizacoes: p.localizacoes || locsGrouped[pId] || []
+            };
+        });
     } catch (err) {
         console.warn('Erro ao buscar parceiros:', err);
     }

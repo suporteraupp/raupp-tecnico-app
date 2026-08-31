@@ -114,30 +114,90 @@ export function App() {
     );
   }
 
-  // Extração de Cidades Únicas com Contadores
+  // Extração de Cidades Únicas com Contadores Dinâmicos
   const citiesMap = {};
+
+  const getCityString = (obj = {}) => {
+    return (obj.end_cidade || obj.cidade || obj.end_cid || obj.nome_cidade || '').trim();
+  };
+
+  const extractPartnerCities = (p) => {
+    const pCities = new Set();
+    const mainCity = getCityString(p);
+    if (mainCity) pCities.add(mainCity);
+
+    if (Array.isArray(p.localizacoes)) {
+      p.localizacoes.forEach(l => {
+        const lCity = getCityString(l);
+        if (lCity) pCities.add(lCity);
+      });
+    }
+    return pCities;
+  };
+
+  // 1. Mapear todas as cidades disponíveis (Chamados + Parceiros + Sub-localizações)
+  parceiros.forEach(p => {
+    const pCities = extractPartnerCities(p);
+    pCities.forEach(city => {
+      const key = city.toUpperCase();
+      if (!citiesMap[key]) {
+        citiesMap[key] = { name: city, count: 0 };
+      }
+    });
+  });
 
   chamados.forEach(c => {
     const loc = c.parceiro_localizacao || {};
     const parceiro = c.parceiro || {};
-    const city = (loc.end_cidade || parceiro.end_cidade || '').trim();
+    const city = getCityString(c) || getCityString(loc) || getCityString(parceiro);
     if (city) {
       const key = city.toUpperCase();
       if (!citiesMap[key]) {
         citiesMap[key] = { name: city, count: 0 };
       }
-      citiesMap[key].count += 1;
     }
   });
 
-  const availableCities = Object.values(citiesMap).sort((a, b) => b.count - a.count);
+  // 2. Calcular contadores numéricos com base na visão/aba ativa
+  if (currentTab === 'clientes') {
+    parceiros.forEach(p => {
+      const pCities = extractPartnerCities(p);
+      pCities.forEach(city => {
+        const key = city.toUpperCase();
+        if (citiesMap[key]) {
+          citiesMap[key].count += 1;
+        }
+      });
+    });
+  } else {
+    // Abas de Ordens de Serviço (abertos, em_atendimento, concluido)
+    const targetChamados = (currentTab === 'aberto' || currentTab === 'em_atendimento' || currentTab === 'concluido')
+      ? chamados.filter(c => c.status_chamado === currentTab)
+      : chamados;
+
+    targetChamados.forEach(c => {
+      const loc = c.parceiro_localizacao || {};
+      const parceiro = c.parceiro || {};
+      const city = getCityString(c) || getCityString(loc) || getCityString(parceiro);
+      if (city) {
+        const key = city.toUpperCase();
+        if (citiesMap[key]) {
+          citiesMap[key].count += 1;
+        }
+      }
+    });
+  }
+
+  const availableCities = Object.values(citiesMap)
+    .filter(c => c.count > 0)
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
   // Filtragem por Cidade
   const filteredByCityChamados = selectedCity
     ? chamados.filter(c => {
         const loc = c.parceiro_localizacao || {};
         const parceiro = c.parceiro || {};
-        const city = (loc.end_cidade || parceiro.end_cidade || '').toLowerCase();
+        const city = (getCityString(c) || getCityString(loc) || getCityString(parceiro)).toLowerCase();
         return city.includes(selectedCity.toLowerCase());
       })
     : chamados;
@@ -148,7 +208,11 @@ export function App() {
   const filteredList = filteredByCityChamados.filter(c => c.status_chamado === currentTab);
 
   const filteredByCityParceiros = selectedCity
-    ? parceiros.filter(p => (p.end_cidade || '').toLowerCase().includes(selectedCity.toLowerCase()))
+    ? parceiros.filter(p => {
+        const selCity = selectedCity.toLowerCase();
+        const pCities = extractPartnerCities(p);
+        return Array.from(pCities).some(c => c.toLowerCase().includes(selCity));
+      })
     : parceiros;
 
   return (

@@ -10,8 +10,10 @@ export function ClientList({ parceiros, loading, selectedCity }) {
 
   const filteredParceiros = parceiros.filter((p) => {
     if (selectedCity) {
-      const cityMatches = (p.end_cidade || '').toLowerCase().includes(selectedCity.toLowerCase());
-      if (!cityMatches) return false;
+      const selCity = selectedCity.toLowerCase();
+      const mainMatch = (p.end_cidade || '').toLowerCase().includes(selCity);
+      const locMatch = Array.isArray(p.localizacoes) && p.localizacoes.some((l) => (l.end_cidade || '').toLowerCase().includes(selCity));
+      if (!mainMatch && !locMatch) return false;
     }
 
     const term = searchTerm.toLowerCase();
@@ -20,12 +22,17 @@ export function ClientList({ parceiros, loading, selectedCity }) {
     const doc = (p.doc_principal || '').toLowerCase();
     const cidade = (p.end_cidade || '').toLowerCase();
     const bairro = (p.end_bairro || '').toLowerCase();
+    const locInfo = Array.isArray(p.localizacoes)
+      ? p.localizacoes.map((l) => `${l.nome_site || ''} ${l.end_cidade || ''} ${l.end_bairro || ''} ${l.end_logradouro || ''}`).join(' ').toLowerCase()
+      : '';
+
     return (
       nome.includes(term) ||
       fantasia.includes(term) ||
       doc.includes(term) ||
       cidade.includes(term) ||
-      bairro.includes(term)
+      bairro.includes(term) ||
+      locInfo.includes(term)
     );
   });
 
