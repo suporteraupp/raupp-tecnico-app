@@ -18,8 +18,11 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
 
   useEffect(() => {
     // Carrega peças disponíveis na maleta do técnico
-    const items = getEstoqueVolante();
-    setEstoqueVolante(items.filter(i => i.quantidade > 0));
+    async function loadItems() {
+      const items = await getEstoqueVolante();
+      setEstoqueVolante(items.filter(i => i.quantidade > 0));
+    }
+    loadItems();
   }, []);
 
   const handleAddPecaOS = () => {
@@ -196,7 +199,7 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
       // Dá baixa automática no estoque volante
       if (pecasUtilizadas.length > 0) {
         const clienteNome = os.parceiro?.nome_principal || os.solicitante_nome || 'Cliente';
-        darBaixaPecasOS(os.numero_os, clienteNome, pecasUtilizadas);
+        await darBaixaPecasOS(os.numero_os, clienteNome, pecasUtilizadas);
       }
 
       await onSubmit({

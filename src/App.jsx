@@ -284,16 +284,18 @@ export function App() {
             </p>
           </div>
         ) : (
-          filteredList.map(os => (
-            <OsCard
-              key={os.id_os_chamados}
-              os={os}
-              currentTab={currentTab}
-              onStartOs={handleStartOs}
-              onOpenSignatureModal={setActiveOsForSignature}
-              onOpenHistory={handleOpenHistory}
-            />
-          ))
+          <div className="os-cards-container">
+            {filteredList.map(os => (
+              <OsCard
+                key={os.id_os_chamados}
+                os={os}
+                currentTab={currentTab}
+                onStartOs={handleStartOs}
+                onOpenSignatureModal={setActiveOsForSignature}
+                onOpenHistory={handleOpenHistory}
+              />
+            ))}
+          </div>
         )}
       </main>
 

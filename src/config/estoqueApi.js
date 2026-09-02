@@ -1,119 +1,84 @@
 /**
  * Módulo de Gestão de Estoque Volante (Maleta do Técnico / Carro)
  * Raupp Técnico App - ERP Soluções em Impressão
+ * Conectado diretamente à tabela 'produtos' no Supabase PostgreSQL
  */
+
+import { supabase } from './api';
 
 const STORAGE_KEY_ESTOQUE = 'raupp_tech_maleta_estoque';
 const STORAGE_KEY_HISTORICO = 'raupp_tech_maleta_historico';
 const STORAGE_KEY_SOLICITACOES = 'raupp_tech_maleta_solicitacoes';
 
-// Lista inicial de peças padrão na maleta do técnico (Seed Data)
-const INITIAL_MALETA_ITEMS = [
-  {
-    id: 'p-101',
-    codigo: 'TN-CF226A',
-    nome: 'Toner HP CF226A / 26A',
-    categoria: 'Toner',
-    compatibilidade: 'HP LaserJet Pro M402 / M426',
-    quantidade: 3,
-    qtdMinima: 1,
-    unidade: 'unid',
-    cor: '#00a2e8'
-  },
-  {
-    id: 'p-102',
-    codigo: 'TN-TN580',
-    nome: 'Toner Brother TN-580 / 650',
-    categoria: 'Toner',
-    compatibilidade: 'Brother DCP-8080 / 8085 / 8480',
-    quantidade: 2,
-    qtdMinima: 1,
-    unidade: 'unid',
-    cor: '#00a2e8'
-  },
-  {
-    id: 'p-103',
-    codigo: 'TN-W2022A',
-    nome: 'Toner Colorido Amarelo HP W2022A (416A)',
-    categoria: 'Toner',
-    compatibilidade: 'HP Color LaserJet Pro M454 / M479',
-    quantidade: 1,
-    qtdMinima: 1,
-    unidade: 'unid',
-    cor: '#eab308'
-  },
-  {
-    id: 'p-104',
-    codigo: 'DR-DR520',
-    nome: 'Cilindro / Fotocondutor Brother DR-520',
-    categoria: 'Cilindro',
-    compatibilidade: 'Brother DCP-8080 / 8085 / MFC-8890',
-    quantidade: 1,
-    qtdMinima: 1,
-    unidade: 'unid',
-    cor: '#a855f7'
-  },
-  {
-    id: 'p-105',
-    codigo: 'ROL-HP402',
-    nome: 'Kit Rolete de Tração (Pickup Roller) HP M402',
-    categoria: 'Roletes',
-    compatibilidade: 'HP LaserJet M402 / M403 / M426',
-    quantidade: 4,
-    qtdMinima: 2,
-    unidade: 'kit',
-    cor: '#10b981'
-  },
-  {
-    id: 'p-106',
-    codigo: 'LAM-RIC301',
-    nome: 'Lâmina de Limpeza do Cilindro Ricoh MP 301',
-    categoria: 'Peça Interna',
-    compatibilidade: 'Ricoh Aficio MP 201 / MP 301',
-    quantidade: 2,
-    qtdMinima: 1,
-    unidade: 'unid',
-    cor: '#f97316'
-  },
-  {
-    id: 'p-107',
-    codigo: 'CHIP-CF258A',
-    nome: 'Chip para Toner HP CF258A (58A)',
-    categoria: 'Chip',
-    compatibilidade: 'HP LaserJet M404 / M428',
-    quantidade: 5,
-    qtdMinima: 2,
-    unidade: 'unid',
-    cor: '#ec4899'
-  }
-];
+// Helper: Converte linha da tabela 'produtos' do Supabase para o contrato de Peça do App
+const produtoToPeca = (p) => ({
+  id: p.id_produtos,
+  codigo: p.codigo_sku || String(p.id_produtos).substring(0, 8).toUpperCase(),
+  nome: p.nome_produto,
+  categoria: p.categoria || 'Peças',
+  compatibilidade: p.marca_modelo_compativel || 'Multimarca',
+  quantidade: typeof p.qtd_estoque === 'number' ? p.qtd_estoque : parseInt(p.qtd_estoque) || 0,
+  qtdMinima: typeof p.qtd_estoque_minimo === 'number' ? p.qtd_estoque_minimo : parseInt(p.qtd_estoque_minimo) || 1,
+  unidade: p.unidade_medida || 'unid',
+  cor: (p.categoria || '').toLowerCase().includes('insumo') || (p.categoria || '').toLowerCase().includes('toner') ? '#00a2e8' : '#a855f7'
+});
 
-// Obtém todas as peças do estoque volante
-export const getEstoqueVolante = () => {
+// Helper: Obtém cache local de segurança (Fallback Offline)
+const getEstoqueCache = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_ESTOQUE);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY_ESTOQUE, JSON.stringify(INITIAL_MALETA_ITEMS));
-      return INITIAL_MALETA_ITEMS;
-    }
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error('Erro ao ler estoque volante:', err);
-    return INITIAL_MALETA_ITEMS;
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
   }
 };
 
-// Salva a lista de peças do estoque volante
-export const salvarEstoqueVolante = (items) => {
+// Helper: Salva cache local
+const salvarEstoqueCache = (items) => {
   try {
     localStorage.setItem(STORAGE_KEY_ESTOQUE, JSON.stringify(items));
   } catch (err) {
-    console.error('Erro ao salvar estoque volante:', err);
+    console.error('Erro ao atualizar cache local do estoque:', err);
   }
 };
 
-// Obtém o histórico de movimentações
-export const getHistoricoMovimentacoes = () => {
+/**
+ * Busca todas as peças/produtos do estoque diretamente na tabela 'produtos' do Supabase
+ */
+export const getEstoqueVolante = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('produtos')
+      .select('*')
+      .order('nome_produto', { ascending: true });
+
+    if (!error && data && data.length > 0) {
+      const pecas = data.map(produtoToPeca);
+      salvarEstoqueCache(pecas);
+      return pecas;
+    }
+
+    if (error) {
+      console.warn('Erro ao consultar tabela produtos no Supabase:', error.message);
+    }
+  } catch (err) {
+    console.warn('Falha na comunicação com o Supabase produtos, usando cache local:', err);
+  }
+
+  return getEstoqueCache();
+};
+
+/**
+ * Salva a lista inteira no cache local (se necessário)
+ */
+export const salvarEstoqueVolante = async (items) => {
+  salvarEstoqueCache(items);
+};
+
+/**
+ * Obtém histórico de movimentações (Cache local de histórico + auditoria)
+ */
+export const getHistoricoMovimentacoes = async () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_HISTORICO);
     return raw ? JSON.parse(raw) : [];
@@ -122,92 +87,180 @@ export const getHistoricoMovimentacoes = () => {
   }
 };
 
-// Adiciona um registro no histórico
-export const registrarHistorico = (tipo, pecaNome, quantidade, detalhe) => {
+/**
+ * Registra movimentação no histórico
+ */
+export const registrarHistorico = async (tipo, pecaNome, quantidade, detalhe) => {
+  const novoReg = {
+    id: 'h-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+    data: new Date().toISOString(),
+    tipo,
+    pecaNome,
+    quantidade,
+    detalhe
+  };
+
   try {
-    const historico = getHistoricoMovimentacoes();
-    const novoReg = {
-      id: 'h-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-      data: new Date().toISOString(),
-      tipo, // 'baixa_os', 'entrada_manual', 'baixa_manual', 'solicitacao'
-      pecaNome,
-      quantidade,
-      detalhe
-    };
+    const historico = await getHistoricoMovimentacoes();
     historico.unshift(novoReg);
-    // Limita aos últimos 50 registros
     localStorage.setItem(STORAGE_KEY_HISTORICO, JSON.stringify(historico.slice(0, 50)));
-    return novoReg;
   } catch (err) {
-    console.error('Erro ao registrar histórico:', err);
+    console.error('Erro ao gravar histórico:', err);
   }
+
+  return novoReg;
 };
 
-// Atualiza a quantidade de uma peça (delta pode ser positivo para entrada ou negativo para baixa)
-export const atualizarQuantidadePeca = (pecaId, delta, motivo = 'Ajuste manual') => {
-  const items = getEstoqueVolante();
-  const index = items.findIndex(p => p.id === pecaId);
-  if (index === -1) throw new Error('Peça não encontrada no estoque volante.');
+/**
+ * Atualiza a quantidade em estoque de um produto diretamente na tabela 'produtos' do Supabase
+ */
+export const atualizarQuantidadePeca = async (pecaId, delta, motivo = 'Ajuste manual') => {
+  const pecas = await getEstoqueVolante();
+  const index = pecas.findIndex(p => String(p.id) === String(pecaId) || p.codigo === pecaId);
+  if (index === -1) throw new Error('Peça/Produto não encontrado no estoque.');
 
-  const peca = items[index];
+  const peca = pecas[index];
   const novaQtd = Math.max(0, (peca.quantidade || 0) + delta);
-  items[index] = { ...peca, quantidade: novaQtd };
+  pecas[index] = { ...peca, quantidade: novaQtd };
 
-  salvarEstoqueVolante(items);
+  salvarEstoqueCache(pecas);
 
   const tipo = delta < 0 ? 'baixa_manual' : 'entrada_manual';
-  registrarHistorico(tipo, peca.nome, Math.abs(delta), motivo);
+  await registrarHistorico(tipo, peca.nome, Math.abs(delta), motivo);
 
-  return items[index];
+  // Atualização direta no Supabase (tabela produtos)
+  try {
+    const isUuid = peca.id && !String(peca.id).startsWith('p-');
+    let query = supabase.from('produtos').update({
+      qtd_estoque: novaQtd,
+      updated_at: new Date().toISOString()
+    });
+
+    if (isUuid) {
+      query = query.eq('id_produtos', peca.id);
+    } else {
+      query = query.eq('codigo_sku', peca.codigo);
+    }
+
+    const { error } = await query;
+    if (error) {
+      console.warn('Erro ao atualizar quantidade na tabela produtos do Supabase:', error.message);
+    }
+  } catch (err) {
+    console.warn('Falha na requisição ao Supabase produtos:', err);
+  }
+
+  return pecas[index];
 };
 
-// Adiciona uma nova peça ao catálogo da maleta
-export const cadastrarNovaPeca = (dadosPeca) => {
-  const items = getEstoqueVolante();
-  const novaPeca = {
+/**
+ * Cadastra uma nova peça/produto diretamente na tabela 'produtos' do Supabase
+ */
+export const cadastrarNovaPeca = async (dadosPeca) => {
+  const pecas = await getEstoqueVolante();
+  const sku = dadosPeca.codigo?.trim().toUpperCase() || 'PEC-' + Math.floor(Math.random() * 8999 + 1000);
+  const qtd = parseInt(dadosPeca.quantidade) || 0;
+  const qtdMin = parseInt(dadosPeca.qtdMinima) || 1;
+
+  const novaPecaLocal = {
     id: 'p-' + Date.now(),
-    codigo: dadosPeca.codigo?.trim().toUpperCase() || 'PEC-' + Math.floor(Math.random() * 8999 + 1000),
+    codigo: sku,
     nome: dadosPeca.nome.trim(),
-    categoria: dadosPeca.categoria || 'Toner',
+    categoria: dadosPeca.categoria || 'Peças',
     compatibilidade: dadosPeca.compatibilidade?.trim() || 'Multimarca',
-    quantidade: parseInt(dadosPeca.quantidade) || 0,
-    qtdMinima: parseInt(dadosPeca.qtdMinima) || 1,
-    unidade: dadosPeca.unidade || 'unid',
+    quantidade: qtd,
+    qtdMinima: qtdMin,
+    unidade: dadosPeca.unidade || 'UN',
     cor: dadosPeca.categoria === 'Toner' ? '#00a2e8' : '#a855f7'
   };
 
-  items.unshift(novaPeca);
-  salvarEstoqueVolante(items);
-  registrarHistorico('entrada_manual', novaPeca.nome, novaPeca.quantidade, 'Cadastro de nova peça na maleta');
-  return novaPeca;
+  pecas.unshift(novaPecaLocal);
+  salvarEstoqueCache(pecas);
+
+  await registrarHistorico('entrada_manual', novaPecaLocal.nome, qtd, 'Cadastro de nova peça no estoque');
+
+  // Inserção na tabela 'produtos' do Supabase
+  try {
+    const payload = {
+      codigo_sku: sku,
+      nome_produto: dadosPeca.nome.trim(),
+      categoria: dadosPeca.categoria || 'Peças',
+      marca_modelo_compativel: dadosPeca.compatibilidade?.trim() || 'Multimarca',
+      qtd_estoque: qtd,
+      qtd_estoque_minimo: qtdMin,
+      unidade_medida: dadosPeca.unidade || 'UN',
+      status: 'Ativo'
+    };
+
+    const { data, error } = await supabase
+      .from('produtos')
+      .insert(payload)
+      .select();
+
+    if (!error && data && data.length > 0) {
+      novaPecaLocal.id = data[0].id_produtos;
+      pecas[0].id = data[0].id_produtos;
+      salvarEstoqueCache(pecas);
+    } else if (error) {
+      console.warn('Erro ao inserir produto na tabela produtos do Supabase:', error.message);
+    }
+  } catch (err) {
+    console.warn('Erro ao cadastrar peça no Supabase:', err);
+  }
+
+  return novaPecaLocal;
 };
 
-// Registra baixa de peças na conclusão de uma OS
-export const darBaixaPecasOS = (osNumero, clienteNome, pecasUtilizadas) => {
+/**
+ * Registra baixa automática de peças na tabela 'produtos' do Supabase ao concluir uma OS
+ */
+export const darBaixaPecasOS = async (osNumero, clienteNome, pecasUtilizadas) => {
   if (!pecasUtilizadas || pecasUtilizadas.length === 0) return;
 
-  const items = getEstoqueVolante();
+  const pecas = await getEstoqueVolante();
 
-  pecasUtilizadas.forEach(pu => {
-    const idx = items.findIndex(item => item.id === pu.id);
+  for (const pu of pecasUtilizadas) {
+    const idx = pecas.findIndex(item => String(item.id) === String(pu.id) || item.codigo === pu.codigo);
     if (idx !== -1) {
       const qtdUsada = parseInt(pu.qtdUtilizada) || 1;
-      items[idx].quantidade = Math.max(0, items[idx].quantidade - qtdUsada);
+      const novaQtd = Math.max(0, pecas[idx].quantidade - qtdUsada);
+      pecas[idx].quantidade = novaQtd;
 
-      registrarHistorico(
+      await registrarHistorico(
         'baixa_os',
-        items[idx].nome,
+        pecas[idx].nome,
         qtdUsada,
         `Consumo na OS #${osNumero || 'S/N'} (${clienteNome || 'Cliente'})`
       );
-    }
-  });
 
-  salvarEstoqueVolante(items);
+      // Atualiza Supabase (tabela produtos)
+      try {
+        const isUuid = pecas[idx].id && !String(pecas[idx].id).startsWith('p-');
+        let query = supabase.from('produtos').update({
+          qtd_estoque: novaQtd,
+          updated_at: new Date().toISOString()
+        });
+
+        if (isUuid) {
+          query = query.eq('id_produtos', pecas[idx].id);
+        } else {
+          query = query.eq('codigo_sku', pecas[idx].codigo);
+        }
+
+        await query;
+      } catch (err) {
+        console.warn('Erro ao atualizar baixa de produtos no Supabase:', err);
+      }
+    }
+  }
+
+  salvarEstoqueCache(pecas);
 };
 
-// Obter solicitações de reposição
-export const getSolicitacoesReposicao = () => {
+/**
+ * Obter solicitações de reposição
+ */
+export const getSolicitacoesReposicao = async () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_SOLICITACOES);
     return raw ? JSON.parse(raw) : [];
@@ -216,9 +269,10 @@ export const getSolicitacoesReposicao = () => {
   }
 };
 
-// Registrar solicitação de reposição para o almoxarifado central
-export const criarSolicitacaoReposicao = (pecaId, pecaNome, qtdSolicitada, observacao = '') => {
-  const solicitacoes = getSolicitacoesReposicao();
+/**
+ * Criar solicitação de reposição
+ */
+export const criarSolicitacaoReposicao = async (pecaId, pecaNome, qtdSolicitada, observacao = '') => {
   const novaSol = {
     id: 'sol-' + Date.now(),
     data: new Date().toISOString(),
@@ -226,16 +280,22 @@ export const criarSolicitacaoReposicao = (pecaId, pecaNome, qtdSolicitada, obser
     pecaNome,
     qtdSolicitada: parseInt(qtdSolicitada) || 1,
     observacao,
-    status: 'pendente' // 'pendente', 'aprovada', 'atendida'
+    status: 'pendente'
   };
-  solicitacoes.unshift(novaSol);
-  localStorage.setItem(STORAGE_KEY_SOLICITACOES, JSON.stringify(solicitacoes));
 
-  registrarHistorico(
+  try {
+    const solicitacoes = await getSolicitacoesReposicao();
+    solicitacoes.unshift(novaSol);
+    localStorage.setItem(STORAGE_KEY_SOLICITACOES, JSON.stringify(solicitacoes));
+  } catch (err) {
+    console.error('Erro ao gravar solicitação local:', err);
+  }
+
+  await registrarHistorico(
     'solicitacao',
     pecaNome,
     novaSol.qtdSolicitada,
-    `Solicitação de reposição enviada ao almoxarifado ${observacao ? `("${observacao}")` : ''}`
+    `Solicitação de reposição para almoxarifado ${observacao ? `("${observacao}")` : ''}`
   );
 
   return novaSol;

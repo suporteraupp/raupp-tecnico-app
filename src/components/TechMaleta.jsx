@@ -36,21 +36,27 @@ export function TechMaleta({ showToast }) {
   const [historico, setHistorico] = useState([]);
   const [solicitacoes, setSolicitacoes] = useState([]);
 
-  const carregarDados = useCallback(() => {
-    const items = getEstoqueVolante();
-    setEstoque(items);
-    setHistorico(getHistoricoMovimentacoes());
-    setSolicitacoes(getSolicitacoesReposicao());
+  const carregarDados = useCallback(async () => {
+    try {
+      const items = await getEstoqueVolante();
+      setEstoque(items);
+      const hist = await getHistoricoMovimentacoes();
+      setHistorico(hist);
+      const solic = await getSolicitacoesReposicao();
+      setSolicitacoes(solic);
+    } catch (err) {
+      console.warn('Erro ao carregar dados da maleta:', err);
+    }
   }, []);
 
   useEffect(() => {
     carregarDados();
   }, [carregarDados]);
 
-  const handleUpdateQtd = (id, delta, motivo) => {
+  const handleUpdateQtd = async (id, delta, motivo) => {
     try {
-      atualizarQuantidadePeca(id, delta, motivo);
-      carregarDados();
+      await atualizarQuantidadePeca(id, delta, motivo);
+      await carregarDados();
       const acao = delta > 0 ? 'Entrada' : 'Baixa';
       showToast(`${acao} registrada com sucesso no estoque volante!`, 'success');
     } catch (err) {
@@ -58,13 +64,13 @@ export function TechMaleta({ showToast }) {
     }
   };
 
-  const handleCreatePeca = (e) => {
+  const handleCreatePeca = async (e) => {
     e.preventDefault();
     if (!newPeca.nome.trim()) {
       showToast('Por favor, informe a descrição da peça.', 'warning');
       return;
     }
-    cadastrarNovaPeca(newPeca);
+    await cadastrarNovaPeca(newPeca);
     showToast('Nova peça adicionada à maleta do técnico!', 'success');
     setShowAddModal(false);
     setNewPeca({
@@ -76,10 +82,10 @@ export function TechMaleta({ showToast }) {
       qtdMinima: '1',
       unidade: 'unid'
     });
-    carregarDados();
+    await carregarDados();
   };
 
-  const handleSendSolicitacao = (e) => {
+  const handleSendSolicitacao = async (e) => {
     e.preventDefault();
     if (!solicitarData.pecaId) {
       showToast('Selecione a peça para solicitar ao almoxarifado.', 'warning');
@@ -89,7 +95,7 @@ export function TechMaleta({ showToast }) {
     const peca = estoque.find(p => p.id === solicitarData.pecaId);
     if (!peca) return;
 
-    criarSolicitacaoReposicao(
+    await criarSolicitacaoReposicao(
       peca.id,
       peca.nome,
       solicitarData.quantidade,
@@ -99,7 +105,7 @@ export function TechMaleta({ showToast }) {
     showToast(`Solicitação de ${solicitarData.quantidade}x ${peca.nome} enviada ao almoxarifado!`, 'success');
     setShowReposicaoModal(false);
     setSolicitarData({ pecaId: '', quantidade: '1', observacao: '' });
-    carregarDados();
+    await carregarDados();
   };
 
   // Filtragem
