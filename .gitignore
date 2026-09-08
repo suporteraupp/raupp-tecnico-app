@@ -12,6 +12,9 @@ dist
 dist-ssr
 # Environment variables
 .env
+.env.example
+api.js
+estoqueApi.js
 .env*.local
 
 # Editor directories and files
