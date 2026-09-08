@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { SupplyLevelBadge } from './SupplyLevelBadge';
 
 export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpenHistory }) {
   const [expanded, setExpanded] = useState(currentTab === 'em_atendimento');
@@ -12,6 +13,7 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
 
   const prioClass = `prio-${(os.prioridade || 'normal').toLowerCase()}`;
   const numOsFormatted = os.numero_os ? `OS #${os.numero_os}` : `OS #${String(os.id_os_chamados || '').substring(0, 8).toUpperCase()}`;
+
 
   // Telefone / Contatos
   const foneCliente = os.solicitante_telefone || loc.contato1_fone || parceiro.contato1_fone || parceiro.doc_principal || '';
@@ -57,11 +59,12 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
     <div className="os-card" style={{ padding: '14px 16px' }}>
       {/* Cabeçalho do Card (Visão Compacta Sempre Visível) */}
       <div className="os-card-top" style={{ marginBottom: '8px' }}>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <span className="os-tag">{numOsFormatted}</span>
           <span className={`badge-prio ${prioClass}`}>
             {os.prioridade || 'Normal'}
           </span>
+          <SupplyLevelBadge equipamento={equip} compact={true} />
         </div>
 
         <button
@@ -92,6 +95,7 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
           )}
         </button>
       </div>
+
 
       <div className="client-title" style={{ fontSize: '1.05rem', marginBottom: '4px' }}>
         {parceiro.nome_principal || 'Cliente Não Identificado'}
@@ -167,7 +171,10 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
             )}
           </div>
 
+          <SupplyLevelBadge equipamento={equip} />
+
           {os.solicitante_nome && (
+
             <div className="card-detail-row">
               <i className="fa-solid fa-user"></i>
               <span>Solicitante: <strong style={{ color: '#fff' }}>{os.solicitante_nome}</strong> {foneCliente ? `(${foneCliente})` : ''}</span>

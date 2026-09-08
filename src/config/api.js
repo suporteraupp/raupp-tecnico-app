@@ -395,3 +395,40 @@ export const apiAtualizarStatusChamado = async (id, payload) => {
         throw new Error(err.message || 'Falha ao atualizar no banco de dados Supabase.');
     }
 };
+
+/**
+ * Módulo de Integração com API Printwayy
+ */
+export const PRINTWAYY_API_KEY = import.meta.env.VITE_PRINTWAYY_API_KEY || '7E12C7B3-FBEB-42CB-8C75-7E25E99EAACA';
+
+export const apiFetchPrintwayySuppliesBySerial = async (numeroSerie) => {
+    if (!numeroSerie) return null;
+
+    try {
+        const response = await fetch(`https://api.printwayy.com/v2/printers?serial=${encodeURIComponent(numeroSerie)}`, {
+            headers: {
+                'Authorization': `Bearer ${PRINTWAYY_API_KEY}`,
+                'Accept': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data && data.length > 0) {
+                const printer = data[0];
+                return {
+                    toner_black: printer.supplies?.find(s => /black|pb|preto|k/i.test(s.color))?.level ?? 100,
+                    toner_cyan: printer.supplies?.find(s => /cyan|ciano|c/i.test(s.color))?.level ?? null,
+                    toner_magenta: printer.supplies?.find(s => /magenta|m/i.test(s.color))?.level ?? null,
+                    toner_yellow: printer.supplies?.find(s => /yellow|amarelo|y/i.test(s.color))?.level ?? null,
+                    printwayy_last_sync: new Date().toISOString()
+                };
+            }
+        }
+    } catch (err) {
+        console.warn('Busca direta Printwayy:', err);
+    }
+
+    return null;
+};
+
