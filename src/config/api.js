@@ -4,9 +4,13 @@
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://hvwdcsdbqpuqnsacqdpb.supabase.co';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh2d2Rjc2RicXB1cW5zYWNxZHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNDEyMzAsImV4cCI6MjA5NjYxNzIzMH0.hU0KeR0nD0dU8mm_3yc5XfVxJ7iUGG123KtP8BsrP-Q';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+if (!SUPABASE_ANON_KEY) {
+    console.warn('⚠️ AVISO DE SEGURANÇA: VITE_SUPABASE_ANON_KEY não foi encontrada no arquivo .env!');
+}
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY || '');
 
 export const getToken = () => localStorage.getItem('raupp_tech_token');
 export const setToken = (token) => localStorage.setItem('raupp_tech_token', token);
@@ -399,7 +403,7 @@ export const apiAtualizarStatusChamado = async (id, payload) => {
 /**
  * Módulo de Integração com API Printwayy
  */
-export const PRINTWAYY_API_KEY = import.meta.env.VITE_PRINTWAYY_API_KEY || '7E12C7B3-FBEB-42CB-8C75-7E25E99EAACA';
+export const PRINTWAYY_API_KEY = import.meta.env.VITE_PRINTWAYY_API_KEY || '';
 
 export const apiFetchPrintwayySuppliesBySerial = async (numeroSerie) => {
     if (!numeroSerie) return null;

@@ -194,7 +194,12 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
           pecasUtilizadas.map(p => `- ${p.qtdUtilizada}x ${p.nome} [${p.codigo}]`).join('\n');
       }
 
-      const laudoCompleto = `${laudo.trim()}${resumoPecasText}\n---ASSINATURA---\n${signatureBase64}`;
+      // Sanitiza o laudo para evitar injeção de delimitadores de assinatura
+      const laudoSanitizado = laudo.trim()
+        .replace(/---ASSINATURA---/g, '[ASSINATURA]')
+        .replace(/\[Assinatura Digital\]:/g, '[Assinatura Digital]');
+
+      const laudoCompleto = `${laudoSanitizado}${resumoPecasText}\n---ASSINATURA---\n${signatureBase64}`;
 
       // Dá baixa automática no estoque volante
       if (pecasUtilizadas.length > 0) {
