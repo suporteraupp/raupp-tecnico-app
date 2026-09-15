@@ -3,7 +3,7 @@
   "name": "Raupp ERP - App do Técnico",
   "icons": [
     {
-      "src": "/vite.svg",
+      "src": "/favicon.svg",
       "type": "image/svg+xml",
       "sizes": "192x192"
     }
