@@ -108,6 +108,7 @@ export function ClientList({ parceiros, loading, selectedCity }) {
             const isExpanded = expandedId === p.id_parceiros;
             const foneClean = (p.contato1_fone || '').replace(/\D/g, '');
             const hasPhone = foneClean.length >= 8;
+            const waNumber = foneClean.startsWith('55') && foneClean.length >= 12 ? foneClean : `55${foneClean}`;
 
             // Endereço principal
             const endLog = p.end_logradouro || '';
@@ -249,7 +250,7 @@ export function ClientList({ parceiros, loading, selectedCity }) {
                       )}
 
                       {hasPhone && (
-                        <a href={`https://wa.me/55${foneClean}`} target="_blank" rel="noopener noreferrer" className="btn-mobile btn-wats">
+                        <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer" className="btn-mobile btn-wats">
                           <i className="fa-brands fa-whatsapp"></i> WhatsApp
                         </a>
                       )}

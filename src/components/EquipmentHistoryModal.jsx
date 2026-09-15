@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiFetchHistoricoEquipamento } from '../config/api';
+import { apiFetchHistoricoEquipamento } from '../services/supabase/chamadosService';
 import { SupplyLevelBadge } from './SupplyLevelBadge';
 
 export function EquipmentHistoryModal({ equipamentoId, equipamentoLabel, numeroSerie, onClose }) {

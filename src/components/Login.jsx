@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { apiLogin, apiSignUp, setToken, setUser } from '../config/api';
+import { useAuth } from '../context/AuthContext';
 
-export function Login({ onLoginSuccess, showToast }) {
+export function Login({ showToast }) {
+  const { login, signUp } = useAuth();
   const [isRegistering, setIsRegistering] = useState(false);
   const [usuario, setUsuario] = useState('');
   const [password, setPassword] = useState('');
@@ -14,32 +15,28 @@ export function Login({ onLoginSuccess, showToast }) {
     setAuthError('');
 
     if (!usuario.trim() || !password.trim()) {
-      showToast('Preencha usuário/e-mail e senha.', 'warning');
+      if (showToast) showToast('Preencha usuário/e-mail e senha.', 'warning');
       return;
     }
 
     try {
       setLoading(true);
       if (isRegistering) {
-        const res = await apiSignUp(usuario.trim(), password.trim());
+        const res = await signUp(usuario.trim(), password.trim());
         if (res.isNew) {
-          showToast(`Conta criada com sucesso! Bem-vindo, ${res.user.nome}!`, 'success');
-          onLoginSuccess(res.user);
+          if (showToast) showToast(`Conta criada com sucesso! Bem-vindo, ${res.user.nome}!`, 'success');
         } else {
-          showToast(res.message, 'info');
+          if (showToast) showToast(res.message, 'info');
           setIsRegistering(false);
         }
       } else {
-        const data = await apiLogin(usuario.trim(), password.trim());
-        setToken(data.token);
-        setUser(data.user);
-        showToast(`Bem-vindo, ${data.user.nome}!`, 'success');
-        onLoginSuccess(data.user);
+        const data = await login(usuario.trim(), password.trim());
+        if (showToast) showToast(`Bem-vindo, ${data.user.nome}!`, 'success');
       }
     } catch (err) {
       const errorMsg = err.message || 'Erro ao processar autenticação.';
       setAuthError(errorMsg);
-      showToast(errorMsg, 'error');
+      if (showToast) showToast(errorMsg, 'error');
     } finally {
       setLoading(false);
     }

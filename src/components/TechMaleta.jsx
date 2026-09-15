@@ -6,7 +6,7 @@ import {
   getHistoricoMovimentacoes,
   criarSolicitacaoReposicao,
   getSolicitacoesReposicao
-} from '../config/estoqueApi';
+} from '../services/supabase/produtosService';
 
 export function TechMaleta({ showToast }) {
   const [estoque, setEstoque] = useState([]);

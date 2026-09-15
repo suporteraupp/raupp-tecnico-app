@@ -7,9 +7,54 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
   const parceiro = os.parceiro || {};
   const loc = os.parceiro_localizacao || {};
   const equip = os.equipamento || {};
-  const marca = equip.marca ? equip.marca.nome_marca : '';
-  const modelo = equip.modelo ? equip.modelo.nome_modelo : '';
-  const equipLabel = [marca, modelo].filter(Boolean).join(' ') || equip.tipo_equipamento || 'Equipamento não especificado';
+
+  const rawMarca = (
+    (typeof equip.marca === 'object' ? equip.marca?.nome_marca : equip.marca) ||
+    equip.nome_marca ||
+    equip.marca_nome ||
+    ''
+  ).trim();
+
+  const rawModelo = (
+    (typeof equip.modelo === 'object' ? equip.modelo?.nome_modelo : equip.modelo) ||
+    equip.nome_modelo ||
+    equip.modelo_nome ||
+    ''
+  ).trim();
+
+  const osEquipDesc = (os.os_equipamento_descricao || equip.nome || equip.descricao || equip.tipo_equipamento || '').trim();
+
+  const detectBrand = (str = '') => {
+    const s = str.toLowerCase();
+    if (s.includes('brother')) return 'Brother';
+    if (s.includes('hp') || s.includes('hewlett')) return 'HP';
+    if (s.includes('samsung')) return 'Samsung';
+    if (s.includes('lexmark')) return 'Lexmark';
+    if (s.includes('kyocera')) return 'Kyocera';
+    if (s.includes('ricoh')) return 'Ricoh';
+    if (s.includes('canon')) return 'Canon';
+    if (s.includes('epson')) return 'Epson';
+    if (s.includes('xerox')) return 'Xerox';
+    if (s.includes('okidata') || s.includes('oki')) return 'OKI';
+    return null;
+  };
+
+  const detectedBrand = rawMarca || detectBrand(osEquipDesc) || detectBrand(rawModelo) || null;
+
+  let fullPrinterName = '';
+  if (rawMarca && rawModelo) {
+    fullPrinterName = `${rawMarca} ${rawModelo}`;
+  } else if (detectedBrand && rawModelo && !rawModelo.toLowerCase().includes(detectedBrand.toLowerCase())) {
+    fullPrinterName = `${detectedBrand} ${rawModelo}`;
+  } else if (osEquipDesc) {
+    fullPrinterName = osEquipDesc;
+  } else if (rawModelo) {
+    fullPrinterName = rawModelo;
+  } else {
+    fullPrinterName = 'Impressora Não Especificada';
+  }
+
+  const numSerie = os.os_equipamento_serie || equip.numero_serie || '';
 
   const prioClass = `prio-${(os.prioridade || 'normal').toLowerCase()}`;
   const numOsFormatted = os.numero_os ? `OS #${os.numero_os}` : `OS #${String(os.id_os_chamados || '').substring(0, 8).toUpperCase()}`;
@@ -19,6 +64,7 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
   const foneCliente = os.solicitante_telefone || loc.contato1_fone || parceiro.contato1_fone || parceiro.doc_principal || '';
   const foneClean = foneCliente.replace(/\D/g, '');
   const hasPhone = foneClean.length >= 8;
+  const waNumber = foneClean.startsWith('55') && foneClean.length >= 12 ? foneClean : `55${foneClean}`;
 
   // Endereço Completo real
   const endLog = loc.end_logradouro || parceiro.end_logradouro || '';
@@ -64,7 +110,7 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
           <span className={`badge-prio ${prioClass}`}>
             {os.prioridade || 'Normal'}
           </span>
-          <SupplyLevelBadge equipamento={equip} compact={true} />
+          <SupplyLevelBadge equipamento={equip} os={os} compact={true} />
         </div>
 
         <button
@@ -99,6 +145,34 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
 
       <div className="client-title" style={{ fontSize: '1.05rem', marginBottom: '4px' }}>
         {parceiro.nome_principal || 'Cliente Não Identificado'}
+      </div>
+
+      {/* Nome e Marca da Impressora Destacados */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+        <i className="fa-solid fa-print" style={{ color: '#00a2e8', fontSize: '0.9rem' }}></i>
+        {detectedBrand && (
+          <span style={{
+            background: 'rgba(0, 162, 232, 0.16)',
+            color: '#38bdf8',
+            border: '1px solid rgba(56, 189, 248, 0.35)',
+            padding: '1px 7px',
+            borderRadius: '6px',
+            fontSize: '0.72rem',
+            fontWeight: 800,
+            letterSpacing: '0.4px',
+            textTransform: 'uppercase'
+          }}>
+            {detectedBrand}
+          </span>
+        )}
+        <span style={{ fontSize: '0.86rem', fontWeight: 700, color: '#f8fafc' }}>
+          {fullPrinterName}
+        </span>
+        {numSerie && (
+          <span style={{ fontSize: '0.76rem', color: '#94a3b8', marginLeft: 'auto' }}>
+            Série: <strong style={{ color: '#cbd5e1' }}>{numSerie}</strong>
+          </span>
+        )}
       </div>
 
       {/* Problema Resumido */}
@@ -137,11 +211,29 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <i className="fa-solid fa-print" style={{ color: '#60a5fa' }}></i>
               <div>
-                <span className="equipment-chip">{equipLabel}</span>
-                {equip.numero_serie && (
-                  <span style={{ fontSize: '0.8rem', color: '#94a3b8', marginLeft: '8px' }}>
-                    Série: <strong style={{ color: '#f1f5f9' }}>{equip.numero_serie}</strong>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  {detectedBrand && (
+                    <span style={{
+                      background: 'linear-gradient(135deg, #00a2e8, #0284c7)',
+                      color: '#ffffff',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      letterSpacing: '0.5px',
+                      textTransform: 'uppercase'
+                    }}>
+                      {detectedBrand}
+                    </span>
+                  )}
+                  <span className="equipment-chip" style={{ fontSize: '0.88rem', fontWeight: 700 }}>
+                    {fullPrinterName}
                   </span>
+                </div>
+                {numSerie && (
+                  <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '3px' }}>
+                    Série: <strong style={{ color: '#f1f5f9' }}>{numSerie}</strong>
+                  </div>
                 )}
               </div>
             </div>
@@ -149,7 +241,7 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
             {onOpenHistory && (os.equipamentos_id || equip.id_equipamentos) && (
               <button
                 type="button"
-                onClick={() => onOpenHistory(os.equipamentos_id || equip.id_equipamentos, equipLabel, equip.numero_serie)}
+                onClick={() => onOpenHistory(os.equipamentos_id || equip.id_equipamentos, fullPrinterName, numSerie)}
                 style={{
                   background: 'rgba(56, 189, 248, 0.12)',
                   border: '1px solid rgba(56, 189, 248, 0.3)',
@@ -171,7 +263,7 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
             )}
           </div>
 
-          <SupplyLevelBadge equipamento={equip} />
+          <SupplyLevelBadge equipamento={equip} os={os} />
 
           {os.solicitante_nome && (
 
@@ -213,7 +305,7 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
             )}
 
             {hasPhone && (
-              <a href={`https://wa.me/55${foneClean}`} target="_blank" rel="noopener noreferrer" className="btn-mobile btn-wats">
+              <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer" className="btn-mobile btn-wats">
                 <i className="fa-brands fa-whatsapp"></i> WhatsApp
               </a>
             )}

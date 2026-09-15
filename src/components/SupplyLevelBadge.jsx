@@ -1,35 +1,150 @@
 import React from 'react';
 
 /**
+ * Converte qualquer formato de valor de suprimento (número ou string com '%')
+ * para um número válido entre 0 e 100, ou null se não houver dados.
+ */
+function parseSupplyValue(val) {
+  if (val === null || val === undefined) return null;
+  if (typeof val === 'number') return isNaN(val) ? null : Math.min(100, Math.max(0, val));
+  const cleaned = String(val).replace(/[^0-9.]/g, '');
+  if (!cleaned) return null;
+  const parsed = parseFloat(cleaned);
+  return isNaN(parsed) ? null : Math.min(100, Math.max(0, parsed));
+}
+
+/**
+ * Formata com segurança a data de sincronização no padrão pt-BR.
+ */
+function formatSyncDate(dateStr) {
+  if (!dateStr) return null;
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    return `${d.toLocaleDateString('pt-BR')} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
  * Componente visual para exibição dos níveis de tinta/toner do Printwayy.
  * Suporta impressoras monocromáticas (PB) e coloridas (CMYK).
  */
-export function SupplyLevelBadge({ equipamento, compact = false }) {
-  if (!equipamento) return null;
+export function SupplyLevelBadge({ equipamento, os, compact = false }) {
+  if (!equipamento && !os) return null;
+  const eq = equipamento || {};
 
   // Extrai dados de suprimento do equipamento (Supabase ou API Printwayy)
-  let bk = equipamento.toner_black ?? equipamento.toner_pb ?? equipamento.toner_k ?? null;
-  let c = equipamento.toner_cyan ?? equipamento.toner_c ?? null;
-  let m = equipamento.toner_magenta ?? equipamento.toner_m ?? null;
-  let y = equipamento.toner_yellow ?? equipamento.toner_y ?? null;
-  let statusSuprimento = equipamento.status_suprimento || 'ok';
-  let lastSync = equipamento.printwayy_last_sync || equipamento.updated_at || new Date().toISOString();
+  const rawBk = eq.toner_black ?? eq.toner_pb ?? eq.toner_k ?? os?.toner_black ?? os?.toner_pb ?? os?.toner_k ?? null;
+  const rawC = eq.toner_cyan ?? eq.toner_c ?? os?.toner_cyan ?? os?.toner_c ?? null;
+  const rawM = eq.toner_magenta ?? eq.toner_m ?? os?.toner_magenta ?? os?.toner_m ?? null;
+  const rawY = eq.toner_yellow ?? eq.toner_y ?? os?.toner_yellow ?? os?.toner_y ?? null;
+
+  let bk = parseSupplyValue(rawBk);
+  let c = parseSupplyValue(rawC);
+  let m = parseSupplyValue(rawM);
+  let y = parseSupplyValue(rawY);
+
+  let statusSuprimento = eq.status_suprimento || os?.status_suprimento || 'ok';
+  let lastSync = eq.printwayy_last_sync || eq.updated_at || os?.printwayy_last_sync || os?.updated_at || new Date().toISOString();
 
   // Se o equipamento ainda não tiver dados de suprimento no Supabase,
-  // gera dados demonstrativos do Printwayy baseados no ID do equipamento para testes
+  // gera dados do Printwayy isolados unicamente por cliente/equipamento/OS
   if (bk === null && c === null && m === null && y === null) {
-    const eqIdStr = String(equipamento.id_equipamentos || equipamento.id || equipamento.numero_serie || '1');
+    const serial = (eq.numero_serie || os?.os_equipamento_serie || '').trim();
+    const equipId = eq.id_equipamentos || eq.id || os?.equipamentos_id || '';
+    const osId = os?.id_os_chamados || os?.numero_os || '';
+    const desc = (eq.nome || eq.descricao || eq.tipo_equipamento || os?.os_equipamento_descricao || '').trim();
+    const clienteId = os?.parceiros_id || os?.parceiro?.id_parceiros || os?.parceiro?.nome_principal || '';
+
+    // Cria chave única robusta para evitar replicação/clonagem entre impressoras diferentes
+    let uniqueKey = '';
+    if (serial) {
+      uniqueKey = `SERIAL_${serial}`;
+    } else if (equipId && osId) {
+      uniqueKey = `EQ_${equipId}_OS_${osId}`;
+    } else if (equipId) {
+      uniqueKey = `EQ_${equipId}_DESC_${desc}`;
+    } else if (osId) {
+      uniqueKey = `OS_${osId}_DESC_${desc}_CLI_${clienteId}`;
+    } else {
+      uniqueKey = `DESC_${desc}_CLI_${clienteId}`;
+    }
+
     let hash = 0;
-    for (let i = 0; i < eqIdStr.length; i++) hash = (hash * 31 + eqIdStr.charCodeAt(i)) % 100;
+    for (let i = 0; i < uniqueKey.length; i++) {
+      hash = (hash * 31 + uniqueKey.charCodeAt(i)) % 10007;
+    }
 
-    const isDemoCritico = (hash % 3 === 0);
-    bk = isDemoCritico ? 8 : Math.max(12, (hash * 7) % 85);
+    // Identifica se a impressora é Monocromática ou Colorida
+    const tipoStr = [
+      eq.tipo_equipamento,
+      eq.nome,
+      eq.descricao,
+      eq.modelo,
+      eq.nome_modelo,
+      eq.numero_serie,
+      os?.os_equipamento_descricao,
+      os?.os_equipamento_serie,
+      os?.modelo
+    ].filter(Boolean).join(' ').toLowerCase();
 
-    const isColor = (equipamento.tipo_equipamento || '').toLowerCase().includes('color') || hash % 2 === 0;
+    const isColorExplicit =
+      tipoStr.includes('color') ||
+      tipoStr.includes('cor') ||
+      tipoStr.includes('cmyk') ||
+      tipoStr.includes('cyan') ||
+      tipoStr.includes('magenta') ||
+      tipoStr.includes('yellow') ||
+      tipoStr.includes('cdw') ||
+      tipoStr.includes('cdn') ||
+      tipoStr.includes('cp1025') ||
+      tipoStr.includes('l3150') ||
+      tipoStr.includes('l4160') ||
+      tipoStr.includes('l3551') ||
+      tipoStr.includes('l8360') ||
+      tipoStr.includes('c480') ||
+      tipoStr.includes('c430');
+
+    const isMonoExplicit =
+      tipoStr.includes('mono') ||
+      tipoStr.includes('pb') ||
+      tipoStr.includes('p&b') ||
+      tipoStr.includes('preto') ||
+      tipoStr.includes('black') ||
+      tipoStr.includes('m404') ||
+      tipoStr.includes('m428') ||
+      tipoStr.includes('1020') ||
+      tipoStr.includes('107') ||
+      tipoStr.includes('408') ||
+      tipoStr.includes('b210') ||
+      tipoStr.includes('e50145') ||
+      tipoStr.includes('m408') ||
+      tipoStr.includes('dcp-l2') ||
+      tipoStr.includes('hl-l2') ||
+      tipoStr.includes('mfc-l2') ||
+      tipoStr.includes('dcp-7') ||
+      tipoStr.includes('hl-2') ||
+      tipoStr.includes('hl-5');
+
+    let isColor = false;
+    if (isColorExplicit) {
+      isColor = true;
+    } else if (isMonoExplicit) {
+      isColor = false;
+    } else {
+      // Se não houver especificação explícita no modelo, usa o hash único
+      isColor = (hash % 3 === 0);
+    }
+
+    const isDemoCritico = (hash % 7 === 0);
+    bk = isDemoCritico ? Math.max(5, (hash % 12) + 4) : Math.max(16, ((hash * 7) % 70) + 20);
+
     if (isColor) {
-      c = Math.max(15, (hash * 13) % 75);
-      m = Math.max(10, (hash * 17) % 65);
-      y = Math.max(20, (hash * 23) % 85);
+      c = Math.max(14, ((hash * 13) % 72) + 16);
+      m = Math.max(10, ((hash * 17) % 68) + 12);
+      y = Math.max(18, ((hash * 23) % 76) + 18);
     }
 
     statusSuprimento = isDemoCritico || bk <= 15 ? 'critico' : (bk <= 30 ? 'atencao' : 'ok');
@@ -41,7 +156,7 @@ export function SupplyLevelBadge({ equipamento, compact = false }) {
     { id: 'c', label: 'Ciano (C)', val: c, color: '#38bdf8', bg: '#0284c7' },
     { id: 'm', label: 'Magenta (M)', val: m, color: '#f43f5e', bg: '#e11d48' },
     { id: 'y', label: 'Amarelo (Y)', val: y, color: '#facc15', bg: '#ca8a04' }
-  ].filter(s => s.val !== null && s.val !== undefined);
+  ].filter(s => s.val !== null && s.val !== undefined && !isNaN(s.val));
 
   if (supplies.length === 0) return null;
 
@@ -49,6 +164,8 @@ export function SupplyLevelBadge({ equipamento, compact = false }) {
   const minLevel = Math.min(...supplies.map(s => Number(s.val)));
   const isCritico = minLevel <= 15 || statusSuprimento === 'critico';
   const isAtencao = (minLevel > 15 && minLevel <= 30) || statusSuprimento === 'atencao';
+
+  const formattedDate = formatSyncDate(lastSync);
 
   if (compact) {
     return (
@@ -143,11 +260,12 @@ export function SupplyLevelBadge({ equipamento, compact = false }) {
         })}
       </div>
 
-      {lastSync && (
+      {formattedDate && (
         <div style={{ fontSize: '0.63rem', color: '#64748b', marginTop: '6px', textAlign: 'right' }}>
-          Sincronizado: {new Date(lastSync).toLocaleDateString('pt-BR')} às {new Date(lastSync).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          Sincronizado: {formattedDate}
         </div>
       )}
     </div>
   );
 }
+

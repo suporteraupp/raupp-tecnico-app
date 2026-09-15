@@ -1,5 +1,5 @@
 import React from 'react';
-import { removeToken } from '../config/api';
+import { removeToken } from '../services/supabase/client';
 
 export function Header({ user, onRefresh, onLogout }) {
   const handleLogout = () => {

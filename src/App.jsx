@@ -1,6 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { getToken, getUser, apiFetchChamados, apiFetchParceiros, apiAtualizarStatusChamado, removeToken } from './config/api';
-import { getEstoqueVolante } from './config/estoqueApi';
+import React, { useState, useEffect } from 'react';
+import { ToastProvider, useToast } from './context/ToastContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { useEstoqueVolante } from './hooks/useEstoqueVolante';
+import { useChamados } from './hooks/useChamados';
+
 import { Login } from './components/Login';
 import { Header } from './components/Header';
 import { TabNav } from './components/TabNav';
@@ -10,235 +13,74 @@ import { CityFilter } from './components/CityFilter';
 import { TechMaleta } from './components/TechMaleta';
 import { SignatureModal } from './components/SignatureModal';
 import { EquipmentHistoryModal } from './components/EquipmentHistoryModal';
-import { Toast } from './components/Toast';
 
-export function App() {
-  const [user, setUserState] = useState(null);
-  const [chamados, setChamados] = useState([]);
-  const [parceiros, setParceiros] = useState([]);
+function TechnicalApp() {
+  const { user, loading: authLoading, logout } = useAuth();
+  const { showToast } = useToast();
+  const { maletaMetrics, updateMaletaMetrics } = useEstoqueVolante();
+
   const [currentTab, setCurrentTab] = useState('aberto');
   const [selectedCity, setSelectedCity] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [loadingParceiros, setLoadingParceiros] = useState(false);
   const [activeOsForSignature, setActiveOsForSignature] = useState(null);
   const [historyModalData, setHistoryModalData] = useState(null);
-  const [toast, setToast] = useState({ message: '', type: 'info' });
 
-  // Métricas do Estoque Volante
-  const [maletaMetrics, setMaletaMetrics] = useState({ total: 0, alertas: 0 });
+  const {
+    loading: dataLoading,
+    loadingParceiros,
+    parceiros,
+    loadData,
+    startOs,
+    completeOs,
+    getFilteredData
+  } = useChamados({ showToast, updateMaletaMetrics });
 
-  const updateMaletaMetrics = useCallback(() => {
-    try {
-      const items = getEstoqueVolante();
-      const alertas = items.filter(i => i.quantidade <= i.qtdMinima).length;
-      setMaletaMetrics({ total: items.length, alertas });
-    } catch {
-      setMaletaMetrics({ total: 0, alertas: 0 });
+  useEffect(() => {
+    if (user) {
+      loadData();
     }
-  }, []);
+  }, [user, loadData]);
 
   const handleOpenHistory = (equipamentoId, equipamentoLabel, numeroSerie) => {
     setHistoryModalData({ equipamentoId, equipamentoLabel, numeroSerie });
   };
 
-  const showToast = useCallback((message, type = 'info') => {
-    setToast({ message, type });
-  }, []);
-
-  const closeToast = useCallback(() => {
-    setToast({ message: '', type: 'info' });
-  }, []);
-
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setLoadingParceiros(true);
-      const [chamadosData, parceirosData] = await Promise.all([
-        apiFetchChamados(),
-        apiFetchParceiros()
-      ]);
-      setChamados(chamadosData);
-      setParceiros(parceirosData);
-      updateMaletaMetrics();
-    } catch (err) {
-      console.error('Erro ao carregar dados:', err);
-      showToast(err.message || 'Erro ao carregar dados.', 'error');
-    } finally {
-      setLoading(false);
-      setLoadingParceiros(false);
-    }
-  }, [showToast, updateMaletaMetrics]);
-
-  useEffect(() => {
-    const token = getToken();
-    const u = getUser();
-    if (token && u) {
-      setUserState(u);
-      loadData();
-    } else {
-      setLoading(false);
-    }
-  }, [loadData]);
-
-  const handleLoginSuccess = (userObj) => {
-    setUserState(userObj);
-    loadData();
-  };
-
-  const handleLogout = () => {
-    removeToken();
-    setUserState(null);
-    setChamados([]);
-    setParceiros([]);
-    setSelectedCity('');
-  };
-
   const handleStartOs = async (osId) => {
-    try {
-      await apiAtualizarStatusChamado(osId, { status_chamado: 'em_atendimento' });
-      showToast('Atendimento iniciado com sucesso!', 'success');
+    const ok = await startOs(osId);
+    if (ok) {
       setCurrentTab('em_atendimento');
-      loadData();
-    } catch (err) {
-      showToast(err.message || 'Erro ao iniciar atendimento.', 'error');
     }
   };
 
   const handleCompleteOsSubmit = async (payload) => {
     if (!activeOsForSignature) return;
-    try {
-      await apiAtualizarStatusChamado(activeOsForSignature.id_os_chamados, payload);
-      showToast('Ordem de Serviço concluída com Assinatura Digital e Baixa de Peças!', 'success');
-      setActiveOsForSignature(null);
-      setCurrentTab('concluido');
-      loadData();
-      updateMaletaMetrics();
-    } catch (err) {
-      showToast(err.message || 'Erro ao concluir Ordem de Serviço.', 'error');
-      throw err;
-    }
+    await completeOs(activeOsForSignature.id_os_chamados, payload);
+    setActiveOsForSignature(null);
+    setCurrentTab('concluido');
   };
 
-  // Se não estiver logado, exibe a tela de login
-  if (!user && !loading) {
-    return (
-      <div className="app-container">
-        <div className="bg-decor bg-decor-1"></div>
-        <div className="bg-decor bg-decor-2"></div>
-        <Toast message={toast.message} type={toast.type} onClose={closeToast} />
-        <Login onLoginSuccess={handleLoginSuccess} showToast={showToast} />
-      </div>
-    );
+  const handleLogout = () => {
+    logout();
+    setSelectedCity('');
+  };
+
+  if (!user && !authLoading) {
+    return <Login showToast={showToast} />;
   }
 
-  // Extração de Cidades Únicas com Contadores Dinâmicos
-  const citiesMap = {};
-
-  const getCityString = (obj = {}) => {
-    return (obj.end_cidade || obj.cidade || obj.end_cid || obj.nome_cidade || '').trim();
-  };
-
-  const extractPartnerCities = (p) => {
-    const pCities = new Set();
-    const mainCity = getCityString(p);
-    if (mainCity) pCities.add(mainCity);
-
-    if (Array.isArray(p.localizacoes)) {
-      p.localizacoes.forEach(l => {
-        const lCity = getCityString(l);
-        if (lCity) pCities.add(lCity);
-      });
-    }
-    return pCities;
-  };
-
-  // 1. Mapear todas as cidades disponíveis (Chamados + Parceiros + Sub-localizações)
-  parceiros.forEach(p => {
-    const pCities = extractPartnerCities(p);
-    pCities.forEach(city => {
-      const key = city.toUpperCase();
-      if (!citiesMap[key]) {
-        citiesMap[key] = { name: city, count: 0 };
-      }
-    });
-  });
-
-  chamados.forEach(c => {
-    const loc = c.parceiro_localizacao || {};
-    const parceiro = c.parceiro || {};
-    const city = getCityString(c) || getCityString(loc) || getCityString(parceiro);
-    if (city) {
-      const key = city.toUpperCase();
-      if (!citiesMap[key]) {
-        citiesMap[key] = { name: city, count: 0 };
-      }
-    }
-  });
-
-  // 2. Calcular contadores numéricos com base na visão/aba ativa
-  if (currentTab === 'clientes') {
-    parceiros.forEach(p => {
-      const pCities = extractPartnerCities(p);
-      pCities.forEach(city => {
-        const key = city.toUpperCase();
-        if (citiesMap[key]) {
-          citiesMap[key].count += 1;
-        }
-      });
-    });
-  } else {
-    // Abas de Ordens de Serviço (abertos, em_atendimento, concluido)
-    const targetChamados = (currentTab === 'aberto' || currentTab === 'em_atendimento' || currentTab === 'concluido')
-      ? chamados.filter(c => c.status_chamado === currentTab)
-      : chamados;
-
-    targetChamados.forEach(c => {
-      const loc = c.parceiro_localizacao || {};
-      const parceiro = c.parceiro || {};
-      const city = getCityString(c) || getCityString(loc) || getCityString(parceiro);
-      if (city) {
-        const key = city.toUpperCase();
-        if (citiesMap[key]) {
-          citiesMap[key].count += 1;
-        }
-      }
-    });
-  }
-
-  const availableCities = Object.values(citiesMap)
-    .filter(c => c.count > 0)
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-
-  // Filtragem por Cidade
-  const filteredByCityChamados = selectedCity
-    ? chamados.filter(c => {
-        const loc = c.parceiro_localizacao || {};
-        const parceiro = c.parceiro || {};
-        const city = (getCityString(c) || getCityString(loc) || getCityString(parceiro)).toLowerCase();
-        return city.includes(selectedCity.toLowerCase());
-      })
-    : chamados;
-
-  const abertos = filteredByCityChamados.filter(c => c.status_chamado === 'aberto');
-  const emCurso = filteredByCityChamados.filter(c => c.status_chamado === 'em_atendimento');
-  const concluidos = filteredByCityChamados.filter(c => c.status_chamado === 'concluido');
-  const filteredList = filteredByCityChamados.filter(c => c.status_chamado === currentTab);
-
-  const filteredByCityParceiros = selectedCity
-    ? parceiros.filter(p => {
-        const selCity = selectedCity.toLowerCase();
-        const pCities = extractPartnerCities(p);
-        return Array.from(pCities).some(c => c.toLowerCase().includes(selCity));
-      })
-    : parceiros;
+  const {
+    availableCities,
+    abertos,
+    emCurso,
+    concluidos,
+    filteredList,
+    filteredByCityParceiros
+  } = getFilteredData(currentTab, selectedCity);
 
   return (
     <div className="app-container">
-      {/* Background Decorativo Raupp ERP */}
+      {/* Ambient Background */}
       <div className="bg-decor bg-decor-1"></div>
       <div className="bg-decor bg-decor-2"></div>
-
-      <Toast message={toast.message} type={toast.type} onClose={closeToast} />
 
       <Header user={user} onRefresh={loadData} onLogout={handleLogout} />
 
@@ -255,8 +97,7 @@ export function App() {
         }}
       />
 
-      {/* Componente de Filtro por Cidade (somente visível nas abas de chamados e clientes) */}
-      {!loading && currentTab !== 'maleta' && (
+      {!dataLoading && currentTab !== 'maleta' && (
         <CityFilter
           selectedCity={selectedCity}
           onSelectCity={setSelectedCity}
@@ -269,11 +110,11 @@ export function App() {
           <TechMaleta showToast={showToast} />
         ) : currentTab === 'clientes' ? (
           <ClientList parceiros={parceiros} loading={loadingParceiros} selectedCity={selectedCity} />
-        ) : loading ? (
+        ) : dataLoading ? (
           <div style={{ textAlign: 'center', padding: '50px 20px', color: '#94a3b8' }}>
             <i className="fa-solid fa-spinner fa-spin fa-2x" style={{ color: '#00a2e8' }}></i>
             <p style={{ marginTop: '12px', fontWeight: 500 }}>Carregando Ordens de Serviço...</p>
-          </div>  
+          </div>
         ) : filteredList.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
             <i className="fa-solid fa-folder-open fa-3x" style={{ opacity: 0.5 }}></i>
@@ -319,4 +160,15 @@ export function App() {
     </div>
   );
 }
+
+export function App() {
+  return (
+    <ToastProvider>
+      <AuthProvider>
+        <TechnicalApp />
+      </AuthProvider>
+    </ToastProvider>
+  );
+}
+
 export default App;

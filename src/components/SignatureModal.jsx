@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { getEstoqueVolante, darBaixaPecasOS } from '../config/estoqueApi';
+import { getEstoqueVolante, darBaixaPecasOS } from '../services/supabase/produtosService';
 
 export function SignatureModal({ os, onClose, onSubmit, showToast }) {
   const canvasRef = useRef(null);
@@ -149,7 +149,9 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
   const handleMove = (e) => {
     if (!isDrawing) return;
     e.preventDefault();
-    setHasSignature(true);
+    if (!hasSignature) {
+      setHasSignature(true);
+    }
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const pos = getPos(e);
