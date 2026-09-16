@@ -5,12 +5,19 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: '0.0.0.0',
+    host: true,
     port: process.env.PORT ? parseInt(process.env.PORT) : 5173,
     allowedHosts: true,
+    proxy: {
+      '/api/printwayy': {
+        target: 'https://api.printwayy.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/printwayy/, ''),
+      },
+    },
   },
   preview: {
-    host: '0.0.0.0',
+    host: true,
     port: process.env.PORT ? parseInt(process.env.PORT) : 5173,
     allowedHosts: true,
   },

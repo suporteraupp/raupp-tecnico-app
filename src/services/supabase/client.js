@@ -1,14 +1,57 @@
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://hvwdcsdbqpuqnsacqdpb.supabase.co';
-const DEFAULT_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh2d2Rjc2RicXB1cW5zYWNxZHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNDEyMzAsImV4cCI6MjA5NjYxNzIzMH0.hU0KeR0nD0dU8mm_3yc5XfVxJ7iUGG123KtP8BsrP-Q';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_ANON_KEY;
+// Carrega variáveis com prefixo VITE_ exigido pelo Vite
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_KEY;
 
-if (!SUPABASE_ANON_KEY) {
-  console.warn('⚠️ AVISO DE SEGURANÇA: VITE_SUPABASE_ANON_KEY não foi encontrada nas variáveis de ambiente.');
+// Verificação explícita de variáveis de ambiente
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('❌ ERRO SUPABASE: Variáveis de ambiente não encontradas!');
+  console.error('Certifique-se de definir VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY (ou VITE_SUPABASE_KEY) no seu arquivo .env.');
+  console.log('Valores atuais:', {
+    VITE_SUPABASE_URL: SUPABASE_URL || 'UNDEFINED',
+    VITE_SUPABASE_ANON_KEY: SUPABASE_ANON_KEY ? 'DEFINIDA (oculta por segurança)' : 'UNDEFINED'
+  });
+} else {
+  console.log('⚡ Supabase Client inicializado com a URL:', SUPABASE_URL);
 }
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const supabase = createClient(
+  SUPABASE_URL || 'https://hvwdcsdbqpuqnsacqdpb.supabase.co',
+  SUPABASE_ANON_KEY || ''
+);
+
+/**
+ * Função utilitária para testar a conexão com a tabela tb_clientes com logs detalhados
+ */
+export const testarConexaoTbClientes = async () => {
+  console.log('🔍 Iniciando teste de consulta na tabela [tb_clientes]...');
+  console.log('URL de destino:', SUPABASE_URL);
+
+  try {
+    const { data, error, status, statusText } = await supabase
+      .from('tb_clientes')
+      .select('*');
+
+    if (error) {
+      console.error('❌ ERRO NA CONSULTA SUPABASE:');
+      console.error('Status HTTP:', status, statusText);
+      console.error('Código do Erro:', error.code);
+      console.error('Mensagem:', error.message);
+      console.error('Detalhes:', error.details);
+      console.error('Dica (Hint):', error.hint);
+      console.error('Objeto de erro completo:', error);
+      return { success: false, error };
+    }
+
+    console.log('✅ SUCESSO! Dados retornados da tabela tb_clientes:');
+    console.table(data);
+    return { success: true, data };
+  } catch (err) {
+    console.error('💥 EXCEÇÃO INESPERADA AO CONECTAR AO SUPABASE:', err);
+    return { success: false, error: err };
+  }
+};
 
 export const getToken = () => localStorage.getItem('raupp_tech_token');
 export const setToken = (token) => localStorage.setItem('raupp_tech_token', token);

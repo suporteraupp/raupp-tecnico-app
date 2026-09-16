@@ -1,3 +1,5 @@
+import { getSerialNumber } from '../../services/printwayyService';
+
 export const detectBrand = (str = '') => {
   const s = str.toLowerCase();
   if (s.includes('brother')) return 'Brother';
@@ -45,7 +47,7 @@ export const extractPrinterInfo = (equip = {}, os = {}) => {
     fullPrinterName = 'Impressora Não Especificada';
   }
 
-  const numSerie = os.os_equipamento_serie || equip.numero_serie || '';
+  const numSerie = getSerialNumber(equip, os);
 
   return {
     detectedBrand,

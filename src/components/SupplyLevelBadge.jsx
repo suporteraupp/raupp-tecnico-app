@@ -1,17 +1,6 @@
-import React from 'react';
-
-/**
- * Converte qualquer formato de valor de suprimento (número ou string com '%')
- * para um número válido entre 0 e 100, ou null se não houver dados.
- */
-function parseSupplyValue(val) {
-  if (val === null || val === undefined) return null;
-  if (typeof val === 'number') return isNaN(val) ? null : Math.min(100, Math.max(0, val));
-  const cleaned = String(val).replace(/[^0-9.]/g, '');
-  if (!cleaned) return null;
-  const parsed = parseFloat(cleaned);
-  return isNaN(parsed) ? null : Math.min(100, Math.max(0, parsed));
-}
+import React, { useState, useEffect } from 'react';
+import { getPrintwayyDataBySerial } from '../services/printwayyService';
+import { fetchPrintwayyDataBySerial } from '../services/printwayyApi';
 
 /**
  * Formata com segurança a data de sincronização no padrão pt-BR.
@@ -28,128 +17,49 @@ function formatSyncDate(dateStr) {
 }
 
 /**
- * Componente visual para exibição dos níveis de tinta/toner do Printwayy.
- * Suporta impressoras monocromáticas (PB) e coloridas (CMYK).
+ * Componente visual elegante para exibição dos níveis de tinta/toner do Printwayy.
  */
 export function SupplyLevelBadge({ equipamento, os, compact = false }) {
   if (!equipamento && !os) return null;
-  const eq = equipamento || {};
 
-  // Extrai dados de suprimento do equipamento (Supabase ou API Printwayy)
-  const rawBk = eq.toner_black ?? eq.toner_pb ?? eq.toner_k ?? os?.toner_black ?? os?.toner_pb ?? os?.toner_k ?? null;
-  const rawC = eq.toner_cyan ?? eq.toner_c ?? os?.toner_cyan ?? os?.toner_c ?? null;
-  const rawM = eq.toner_magenta ?? eq.toner_m ?? os?.toner_magenta ?? os?.toner_m ?? null;
-  const rawY = eq.toner_yellow ?? eq.toner_y ?? os?.toner_yellow ?? os?.toner_y ?? null;
+  const initialPwData = getPrintwayyDataBySerial(equipamento, os);
+  const [pwData, setPwData] = useState(initialPwData);
 
-  let bk = parseSupplyValue(rawBk);
-  let c = parseSupplyValue(rawC);
-  let m = parseSupplyValue(rawM);
-  let y = parseSupplyValue(rawY);
+  useEffect(() => {
+    let isMounted = true;
+    const serial = initialPwData.serial;
 
-  let statusSuprimento = eq.status_suprimento || os?.status_suprimento || 'ok';
-  let lastSync = eq.printwayy_last_sync || eq.updated_at || os?.printwayy_last_sync || os?.updated_at || new Date().toISOString();
-
-  // Se o equipamento ainda não tiver dados de suprimento no Supabase,
-  // gera dados do Printwayy isolados unicamente por cliente/equipamento/OS
-  if (bk === null && c === null && m === null && y === null) {
-    const serial = (eq.numero_serie || os?.os_equipamento_serie || '').trim();
-    const equipId = eq.id_equipamentos || eq.id || os?.equipamentos_id || '';
-    const osId = os?.id_os_chamados || os?.numero_os || '';
-    const desc = (eq.nome || eq.descricao || eq.tipo_equipamento || os?.os_equipamento_descricao || '').trim();
-    const clienteId = os?.parceiros_id || os?.parceiro?.id_parceiros || os?.parceiro?.nome_principal || '';
-
-    // Cria chave única robusta para evitar replicação/clonagem entre impressoras diferentes
-    let uniqueKey = '';
     if (serial) {
-      uniqueKey = `SERIAL_${serial}`;
-    } else if (equipId && osId) {
-      uniqueKey = `EQ_${equipId}_OS_${osId}`;
-    } else if (equipId) {
-      uniqueKey = `EQ_${equipId}_DESC_${desc}`;
-    } else if (osId) {
-      uniqueKey = `OS_${osId}_DESC_${desc}_CLI_${clienteId}`;
-    } else {
-      uniqueKey = `DESC_${desc}_CLI_${clienteId}`;
+      fetchPrintwayyDataBySerial(serial).then(apiRes => {
+        if (isMounted && apiRes && apiRes.supplies) {
+          setPwData(prev => ({
+            ...prev,
+            isRealData: true,
+            supplies: {
+              black: apiRes.supplies.black ?? apiRes.supplies.preto ?? prev.supplies.black,
+              cyan: apiRes.supplies.cyan ?? apiRes.supplies.ciano ?? prev.supplies.cyan,
+              magenta: apiRes.supplies.magenta ?? prev.supplies.magenta,
+              yellow: apiRes.supplies.yellow ?? apiRes.supplies.amarelo ?? prev.supplies.yellow
+            }
+          }));
+        }
+      });
     }
 
-    let hash = 0;
-    for (let i = 0; i < uniqueKey.length; i++) {
-      hash = (hash * 31 + uniqueKey.charCodeAt(i)) % 10007;
-    }
+    return () => {
+      isMounted = false;
+    };
+  }, [initialPwData.serial]);
 
-    // Identifica se a impressora é Monocromática ou Colorida
-    const tipoStr = [
-      eq.tipo_equipamento,
-      eq.nome,
-      eq.descricao,
-      eq.modelo,
-      eq.nome_modelo,
-      eq.numero_serie,
-      os?.os_equipamento_descricao,
-      os?.os_equipamento_serie,
-      os?.modelo
-    ].filter(Boolean).join(' ').toLowerCase();
+  const { bk, c, m, y } = {
+    bk: pwData.supplies.black,
+    c: pwData.supplies.cyan,
+    m: pwData.supplies.magenta,
+    y: pwData.supplies.yellow
+  };
 
-    const isColorExplicit =
-      tipoStr.includes('color') ||
-      tipoStr.includes('cor') ||
-      tipoStr.includes('cmyk') ||
-      tipoStr.includes('cyan') ||
-      tipoStr.includes('magenta') ||
-      tipoStr.includes('yellow') ||
-      tipoStr.includes('cdw') ||
-      tipoStr.includes('cdn') ||
-      tipoStr.includes('cp1025') ||
-      tipoStr.includes('l3150') ||
-      tipoStr.includes('l4160') ||
-      tipoStr.includes('l3551') ||
-      tipoStr.includes('l8360') ||
-      tipoStr.includes('c480') ||
-      tipoStr.includes('c430');
-
-    const isMonoExplicit =
-      tipoStr.includes('mono') ||
-      tipoStr.includes('pb') ||
-      tipoStr.includes('p&b') ||
-      tipoStr.includes('preto') ||
-      tipoStr.includes('black') ||
-      tipoStr.includes('m404') ||
-      tipoStr.includes('m428') ||
-      tipoStr.includes('1020') ||
-      tipoStr.includes('107') ||
-      tipoStr.includes('408') ||
-      tipoStr.includes('b210') ||
-      tipoStr.includes('e50145') ||
-      tipoStr.includes('m408') ||
-      tipoStr.includes('dcp-l2') ||
-      tipoStr.includes('hl-l2') ||
-      tipoStr.includes('mfc-l2') ||
-      tipoStr.includes('dcp-7') ||
-      tipoStr.includes('hl-2') ||
-      tipoStr.includes('hl-5');
-
-    let isColor = false;
-    if (isColorExplicit) {
-      isColor = true;
-    } else if (isMonoExplicit) {
-      isColor = false;
-    } else {
-      // Se não houver especificação explícita no modelo, usa o hash único
-      isColor = (hash % 3 === 0);
-    }
-
-    const isDemoCritico = (hash % 7 === 0);
-    bk = isDemoCritico ? Math.max(5, (hash % 12) + 4) : Math.max(16, ((hash * 7) % 70) + 20);
-
-    if (isColor) {
-      c = Math.max(14, ((hash * 13) % 72) + 16);
-      m = Math.max(10, ((hash * 17) % 68) + 12);
-      y = Math.max(18, ((hash * 23) % 76) + 18);
-    }
-
-    statusSuprimento = isDemoCritico || bk <= 15 ? 'critico' : (bk <= 30 ? 'atencao' : 'ok');
-  }
-
+  const statusSuprimento = pwData.statusSuprimento;
+  const lastSync = pwData.lastSync;
 
   const supplies = [
     { id: 'bk', label: 'Preto (K)', val: bk, color: '#94a3b8', bg: '#1e293b' },
@@ -160,7 +70,6 @@ export function SupplyLevelBadge({ equipamento, os, compact = false }) {
 
   if (supplies.length === 0) return null;
 
-  // Nível mais baixo entre os suprimentos instalados
   const minLevel = Math.min(...supplies.map(s => Number(s.val)));
   const isCritico = minLevel <= 15 || statusSuprimento === 'critico';
   const isAtencao = (minLevel > 15 && minLevel <= 30) || statusSuprimento === 'atencao';
@@ -268,4 +177,5 @@ export function SupplyLevelBadge({ equipamento, os, compact = false }) {
     </div>
   );
 }
+
 

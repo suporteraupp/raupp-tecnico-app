@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { SupplyLevelBadge } from './SupplyLevelBadge';
+import { getSerialNumber } from '../services/printwayyService';
 
 export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpenHistory }) {
   const [expanded, setExpanded] = useState(currentTab === 'em_atendimento');
@@ -54,7 +55,7 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
     fullPrinterName = 'Impressora Não Especificada';
   }
 
-  const numSerie = os.os_equipamento_serie || equip.numero_serie || '';
+  const numSerie = getSerialNumber(equip, os);
 
   const prioClass = `prio-${(os.prioridade || 'normal').toLowerCase()}`;
   const numOsFormatted = os.numero_os ? `OS #${os.numero_os}` : `OS #${String(os.id_os_chamados || '').substring(0, 8).toUpperCase()}`;
