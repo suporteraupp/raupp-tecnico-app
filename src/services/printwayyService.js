@@ -97,6 +97,14 @@ export function isColorPrinter(eq = {}, osObj = {}, serial = '') {
   if (eq.is_color === true || eq.color === true || eq.colorida === true || eq.tipo_suprimento === 'color') return true;
   if (eq.is_color === false || eq.color === false || eq.colorida === false || eq.tipo_suprimento === 'mono') return false;
 
+  // 1.1 Detalhes de equipamento (campo JSON)
+  const det = eq.detalhes_equipamento || osObj.detalhes_equipamento;
+  if (det && typeof det === 'object') {
+    const ti = (det.tipo_impressao || det.tipo_impressora || '').toLowerCase();
+    if (ti.includes('preto') || ti.includes('mono') || ti.includes('pb') || ti.includes('p&b')) return false;
+    if (ti.includes('color') || ti.includes('cor')) return true;
+  }
+
   // 2. Se houver qualquer valor de toner Ciano, Magenta ou Amarelo vindo do banco
   const rawC = extractSupplyChannel(eq, osObj, ['toner_cyan', 'toner_c', 'nivel_c', 'ciano', 'cyan', 'toner_ciano']);
   const rawM = extractSupplyChannel(eq, osObj, ['toner_magenta', 'toner_m', 'nivel_m', 'magenta', 'toner_magenta']);
