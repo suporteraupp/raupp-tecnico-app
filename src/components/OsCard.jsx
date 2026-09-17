@@ -102,13 +102,30 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
     laudoAssinatura = parts[1] ? parts[1].trim() : null;
   }
 
+  const getBrandBadgeStyle = (brand = '') => {
+    const b = (brand || '').toLowerCase();
+    if (b.includes('hp')) return { bg: 'linear-gradient(135deg, #0096d6, #007bba)', color: '#ffffff', shadow: 'rgba(0, 150, 214, 0.4)' };
+    if (b.includes('samsung')) return { bg: 'linear-gradient(135deg, #1428a0, #0c1b75)', color: '#ffffff', shadow: 'rgba(20, 40, 160, 0.4)' };
+    if (b.includes('brother')) return { bg: 'linear-gradient(135deg, #005696, #003e6d)', color: '#ffffff', shadow: 'rgba(0, 86, 150, 0.4)' };
+    if (b.includes('kyocera')) return { bg: 'linear-gradient(135deg, #d01b1b, #a61212)', color: '#ffffff', shadow: 'rgba(208, 27, 27, 0.4)' };
+    if (b.includes('lexmark')) return { bg: 'linear-gradient(135deg, #008744, #006332)', color: '#ffffff', shadow: 'rgba(0, 135, 68, 0.4)' };
+    if (b.includes('epson')) return { bg: 'linear-gradient(135deg, #003399, #002266)', color: '#ffffff', shadow: 'rgba(0, 51, 153, 0.4)' };
+    if (b.includes('ricoh')) return { bg: 'linear-gradient(135deg, #cf142b, #9e0e1e)', color: '#ffffff', shadow: 'rgba(207, 20, 43, 0.4)' };
+    if (b.includes('canon')) return { bg: 'linear-gradient(135deg, #cc0000, #990000)', color: '#ffffff', shadow: 'rgba(204, 0, 0, 0.4)' };
+    return { bg: 'linear-gradient(135deg, #00a2e8, #0284c7)', color: '#ffffff', shadow: 'rgba(0, 162, 232, 0.4)' };
+  };
+
+  const brandStyle = getBrandBadgeStyle(detectedBrand);
+
   return (
-    <div className="os-card" style={{ padding: '14px 16px' }}>
+    <div className="os-card" style={{ padding: '16px 18px', transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)' }}>
       {/* Cabeçalho do Card (Visão Compacta Sempre Visível) */}
-      <div className="os-card-top" style={{ marginBottom: '8px' }}>
+      <div className="os-card-top" style={{ marginBottom: '10px' }}>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span className="os-tag">{numOsFormatted}</span>
+          <span className="os-tag" style={{ boxShadow: '0 2px 8px rgba(56, 189, 248, 0.15)' }}>{numOsFormatted}</span>
           <span className={`badge-prio ${prioClass}`}>
+            {os.prioridade === 'Urgente' && '🔥 '}
+            {os.prioridade === 'Alta' && '⚡ '}
             {os.prioridade || 'Normal'}
           </span>
           <SupplyLevelBadge equipamento={equip} os={os} compact={true} />
@@ -118,17 +135,18 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
           className="btn-expand-toggle"
           onClick={() => setExpanded(!expanded)}
           style={{
-            background: 'rgba(255, 255, 255, 0.06)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
+            background: expanded ? 'rgba(56, 189, 248, 0.16)' : 'rgba(255, 255, 255, 0.06)',
+            border: `1px solid ${expanded ? 'rgba(56, 189, 248, 0.4)' : 'rgba(255, 255, 255, 0.12)'}`,
             color: '#38bdf8',
-            padding: '4px 10px',
-            borderRadius: '16px',
+            padding: '5px 12px',
+            borderRadius: '20px',
             fontSize: '0.78rem',
-            fontWeight: 600,
+            fontWeight: 700,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '5px'
+            gap: '6px',
+            transition: 'all 0.2s ease'
           }}
         >
           {expanded ? (
@@ -143,55 +161,81 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
         </button>
       </div>
 
-
-      <div className="client-title" style={{ fontSize: '1.05rem', marginBottom: '4px' }}>
+      <div className="client-title" style={{ fontSize: '1.12rem', marginBottom: '6px', letterSpacing: '-0.01em' }}>
         {parceiro.nome_principal || 'Cliente Não Identificado'}
       </div>
 
       {/* Nome e Marca da Impressora Destacados */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
-        <i className="fa-solid fa-print" style={{ color: '#00a2e8', fontSize: '0.9rem' }}></i>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        marginBottom: '10px',
+        flexWrap: 'wrap',
+        background: 'rgba(7, 11, 18, 0.5)',
+        padding: '8px 12px',
+        borderRadius: '12px',
+        border: '1px solid rgba(255, 255, 255, 0.05)'
+      }}>
+        <i className="fa-solid fa-print" style={{ color: '#38bdf8', fontSize: '0.95rem' }}></i>
         {detectedBrand && (
           <span style={{
-            background: 'rgba(0, 162, 232, 0.16)',
-            color: '#38bdf8',
-            border: '1px solid rgba(56, 189, 248, 0.35)',
-            padding: '1px 7px',
+            background: brandStyle.bg,
+            color: brandStyle.color,
+            boxShadow: `0 2px 8px ${brandStyle.shadow}`,
+            padding: '2px 9px',
             borderRadius: '6px',
-            fontSize: '0.72rem',
+            fontSize: '0.74rem',
             fontWeight: 800,
-            letterSpacing: '0.4px',
+            letterSpacing: '0.5px',
             textTransform: 'uppercase'
           }}>
             {detectedBrand}
           </span>
         )}
-        <span style={{ fontSize: '0.86rem', fontWeight: 700, color: '#f8fafc' }}>
+        <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f8fafc' }}>
           {fullPrinterName}
         </span>
         {numSerie && (
-          <span style={{ fontSize: '0.76rem', color: '#94a3b8', marginLeft: 'auto' }}>
-            Série: <strong style={{ color: '#cbd5e1' }}>{numSerie}</strong>
+          <span style={{
+            fontSize: '0.76rem',
+            color: '#94a3b8',
+            marginLeft: 'auto',
+            background: 'rgba(255, 255, 255, 0.05)',
+            padding: '2px 8px',
+            borderRadius: '6px',
+            border: '1px solid rgba(255, 255, 255, 0.08)'
+          }}>
+            Série: <strong style={{ color: '#e2e8f0' }}>{numSerie}</strong>
           </span>
         )}
       </div>
 
       {/* Problema Resumido */}
-      <div style={{ fontSize: '0.84rem', color: '#cbd5e1', marginBottom: '8px', display: '-webkit-box', WebkitLineClamp: expanded ? 'none' : '2', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+      <div style={{
+        fontSize: '0.86rem',
+        color: '#cbd5e1',
+        marginBottom: '8px',
+        lineHeight: '1.4',
+        display: '-webkit-box',
+        WebkitLineClamp: expanded ? 'none' : '2',
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden'
+      }}>
         <strong style={{ color: '#60a5fa' }}>Problema:</strong> {os.descricao_problema}
       </div>
 
       {/* Ações diretas rápidas de fluxo */}
       {!expanded && (
-        <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
+        <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
           {currentTab === 'aberto' && (
-            <button className="btn-mobile btn-start" onClick={() => onStartOs(os.id_os_chamados)} style={{ padding: '8px 12px', fontSize: '0.84rem' }}>
+            <button className="btn-mobile btn-start" onClick={() => onStartOs(os.id_os_chamados)} style={{ padding: '9px 14px', fontSize: '0.86rem' }}>
               <i className="fa-solid fa-play"></i> Iniciar Atendimento
             </button>
           )}
 
           {currentTab === 'em_atendimento' && (
-            <button className="btn-mobile btn-complete" onClick={() => onOpenSignatureModal(os)} style={{ padding: '8px 12px', fontSize: '0.84rem' }}>
+            <button className="btn-mobile btn-complete" onClick={() => onOpenSignatureModal(os)} style={{ padding: '9px 14px', fontSize: '0.86rem' }}>
               <i className="fa-solid fa-signature"></i> Concluir & Coletar Assinatura
             </button>
           )}
