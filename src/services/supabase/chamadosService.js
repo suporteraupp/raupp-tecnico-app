@@ -13,35 +13,39 @@ export const apiFetchChamados = async () => {
   try {
     await ensureAuthSession();
 
-    // 1. Join nativo com alias explícitos
-    const { data, error } = await supabase
-      .from('os_chamados')
-      .select('*, parceiro:parceiros!parceiros_id(*), parceiro_localizacao:parceiros_localizacao!parceiros_localizacao_id(*), equipamento:equipamentos!equipamentos_id(*)');
+    // 1. Carrega tabelas de apoio para marcas e modelos
+    const [marcasRes, modelosRes] = await Promise.all([
+      supabase.from('equipamentos_marcas').select('*'),
+      supabase.from('equipamentos_modelos').select('*')
+    ]);
 
-    if (!error && data && data.length > 0) {
-      return data.map(d => ({
-        ...d,
-        parceiro: Array.isArray(d.parceiro) ? d.parceiro[0] : d.parceiro,
-        parceiro_localizacao: Array.isArray(d.parceiro_localizacao) ? d.parceiro_localizacao[0] : d.parceiro_localizacao,
-        equipamento: Array.isArray(d.equipamento) ? d.equipamento[0] : d.equipamento
-      }));
-    }
+    const marcasMap = {};
+    (marcasRes.data || []).forEach(m => {
+      if (m.id_marca) marcasMap[m.id_marca] = m.nome_marca;
+    });
 
-    // 2. Join secundário sem aliases estritos
-    const { data: dataAlt, error: errAlt } = await supabase
-      .from('os_chamados')
-      .select('*, parceiro:parceiros(*), parceiro_localizacao:parceiros_localizacao(*), equipamento:equipamentos(*)');
+    const modelosMap = {};
+    (modelosRes.data || []).forEach(m => {
+      if (m.id_modelo) modelosMap[m.id_modelo] = m.nome_modelo;
+    });
 
-    if (!errAlt && dataAlt && dataAlt.length > 0) {
-      return dataAlt.map(d => ({
-        ...d,
-        parceiro: Array.isArray(d.parceiro) ? d.parceiro[0] : d.parceiro,
-        parceiro_localizacao: Array.isArray(d.parceiro_localizacao) ? d.parceiro_localizacao[0] : d.parceiro_localizacao,
-        equipamento: Array.isArray(d.equipamento) ? d.equipamento[0] : d.equipamento
-      }));
-    }
+    const enrichEquipamento = (eq) => {
+      if (!eq) return null;
+      const nomeMarca = marcasMap[eq.marca_id] || (typeof eq.marca === 'string' ? eq.marca : eq.marca?.nome_marca) || '';
+      const nomeModelo = modelosMap[eq.modelo_id] || (typeof eq.modelo === 'string' ? eq.modelo : eq.modelo?.nome_modelo) || '';
 
-    // 3. Fallback manual em memória seguro por chave primária
+      return {
+        ...eq,
+        nome_marca: nomeMarca,
+        marca_nome: nomeMarca,
+        marca: nomeMarca || eq.marca,
+        nome_modelo: nomeModelo,
+        modelo_nome: nomeModelo,
+        modelo: nomeModelo || eq.modelo
+      };
+    };
+
+    // 2. Busca OSs, Parceiros, Localizações e Equipamentos em paralelo
     const [osRes, parcRes, locRes, eqRes] = await Promise.all([
       supabase.from('os_chamados').select('*'),
       supabase.from('parceiros').select('*'),
@@ -50,6 +54,7 @@ export const apiFetchChamados = async () => {
     ]);
 
     const osList = osRes.data || [];
+
     const parceirosMap = {};
     (parcRes.data || []).forEach(p => {
       const pId = p.id_parceiros ?? p.id_parceiro ?? p.id;
@@ -62,22 +67,27 @@ export const apiFetchChamados = async () => {
       if (lPk !== undefined && lPk !== null) locsMap[String(lPk)] = l;
     });
 
-    const eqMap = {};
+    const eqMapById = {};
+    const eqMapBySerial = {};
     (eqRes.data || []).forEach(e => {
-      const ePk = e.id_equipamentos ?? e.id;
-      if (ePk !== undefined && ePk !== null) eqMap[String(ePk)] = e;
+      const enriched = enrichEquipamento(e);
+      if (e.id_equipamentos) eqMapById[String(e.id_equipamentos)] = enriched;
+      if (e.numero_serie) eqMapBySerial[String(e.numero_serie).trim().toUpperCase()] = enriched;
     });
 
     return osList.map(os => {
       const pId = os.parceiros_id ?? os.parceiro_id;
       const lId = os.parceiros_localizacao_id ?? os.parceiro_localizacao_id;
       const eId = os.equipamentos_id ?? os.equipamento_id;
+      const eSerial = os.os_equipamento_serie ? String(os.os_equipamento_serie).trim().toUpperCase() : '';
+
+      const matchedEq = (eId != null ? eqMapById[String(eId)] : null) || (eSerial ? eqMapBySerial[eSerial] : null);
 
       return {
         ...os,
         parceiro: os.parceiro || (pId != null ? parceirosMap[String(pId)] : null),
         parceiro_localizacao: os.parceiro_localizacao || (lId != null ? locsMap[String(lId)] : null),
-        equipamento: os.equipamento || (eId != null ? eqMap[String(eId)] : null)
+        equipamento: enrichEquipamento(os.equipamento) || matchedEq
       };
     });
   } catch (err) {

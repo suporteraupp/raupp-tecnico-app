@@ -16,6 +16,8 @@ export const detectBrand = (str = '') => {
 };
 
 export const extractPrinterInfo = (equip = {}, os = {}) => {
+  const numSerie = getSerialNumber(equip, os);
+
   const rawMarca = (
     (typeof equip.marca === 'object' ? equip.marca?.nome_marca : equip.marca) ||
     equip.nome_marca ||
@@ -30,9 +32,12 @@ export const extractPrinterInfo = (equip = {}, os = {}) => {
     ''
   ).trim();
 
-  const osEquipDesc = (os.os_equipamento_descricao || equip.nome || equip.descricao || equip.tipo_equipamento || '').trim();
+  const rawDesc = (os.os_equipamento_descricao || equip.nome || equip.descricao || '').trim();
+  const tipoEq = (equip.tipo_equipamento || 'Impressora').trim();
 
-  const detectedBrand = rawMarca || detectBrand(osEquipDesc) || detectBrand(rawModelo) || null;
+  const osEquipDesc = (rawDesc && rawDesc !== 'Impressora' && rawDesc !== 'Multifuncional') ? rawDesc : '';
+
+  const detectedBrand = rawMarca || detectBrand(osEquipDesc) || detectBrand(rawModelo) || detectBrand(rawDesc) || null;
 
   let fullPrinterName = '';
   if (rawMarca && rawModelo) {
@@ -42,12 +47,16 @@ export const extractPrinterInfo = (equip = {}, os = {}) => {
   } else if (osEquipDesc) {
     fullPrinterName = osEquipDesc;
   } else if (rawModelo) {
-    fullPrinterName = rawModelo;
+    fullPrinterName = detectedBrand ? `${detectedBrand} ${rawModelo}` : rawModelo;
+  } else if (rawMarca) {
+    fullPrinterName = `${rawMarca} ${tipoEq}`;
+  } else if (numSerie) {
+    fullPrinterName = `${tipoEq} (${numSerie})`;
+  } else if (os.numero_os) {
+    fullPrinterName = `${tipoEq} OS #${os.numero_os}`;
   } else {
-    fullPrinterName = 'Impressora Não Especificada';
+    fullPrinterName = tipoEq;
   }
-
-  const numSerie = getSerialNumber(equip, os);
 
   return {
     detectedBrand,

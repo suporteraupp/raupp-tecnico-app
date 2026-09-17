@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SupplyLevelBadge } from './SupplyLevelBadge';
 import { getSerialNumber } from '../services/printwayyService';
+import { extractPrinterInfo } from '../domain/equipamentos/brandDetector';
 
 export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpenHistory }) {
   const [expanded, setExpanded] = useState(currentTab === 'em_atendimento');
@@ -9,53 +10,7 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
   const loc = os.parceiro_localizacao || {};
   const equip = os.equipamento || {};
 
-  const rawMarca = (
-    (typeof equip.marca === 'object' ? equip.marca?.nome_marca : equip.marca) ||
-    equip.nome_marca ||
-    equip.marca_nome ||
-    ''
-  ).trim();
-
-  const rawModelo = (
-    (typeof equip.modelo === 'object' ? equip.modelo?.nome_modelo : equip.modelo) ||
-    equip.nome_modelo ||
-    equip.modelo_nome ||
-    ''
-  ).trim();
-
-  const osEquipDesc = (os.os_equipamento_descricao || equip.nome || equip.descricao || equip.tipo_equipamento || '').trim();
-
-  const detectBrand = (str = '') => {
-    const s = str.toLowerCase();
-    if (s.includes('brother')) return 'Brother';
-    if (s.includes('hp') || s.includes('hewlett')) return 'HP';
-    if (s.includes('samsung')) return 'Samsung';
-    if (s.includes('lexmark')) return 'Lexmark';
-    if (s.includes('kyocera')) return 'Kyocera';
-    if (s.includes('ricoh')) return 'Ricoh';
-    if (s.includes('canon')) return 'Canon';
-    if (s.includes('epson')) return 'Epson';
-    if (s.includes('xerox')) return 'Xerox';
-    if (s.includes('okidata') || s.includes('oki')) return 'OKI';
-    return null;
-  };
-
-  const detectedBrand = rawMarca || detectBrand(osEquipDesc) || detectBrand(rawModelo) || null;
-
-  let fullPrinterName = '';
-  if (rawMarca && rawModelo) {
-    fullPrinterName = `${rawMarca} ${rawModelo}`;
-  } else if (detectedBrand && rawModelo && !rawModelo.toLowerCase().includes(detectedBrand.toLowerCase())) {
-    fullPrinterName = `${detectedBrand} ${rawModelo}`;
-  } else if (osEquipDesc) {
-    fullPrinterName = osEquipDesc;
-  } else if (rawModelo) {
-    fullPrinterName = rawModelo;
-  } else {
-    fullPrinterName = 'Impressora Não Especificada';
-  }
-
-  const numSerie = getSerialNumber(equip, os);
+  const { detectedBrand, fullPrinterName, numSerie } = extractPrinterInfo(equip, os);
 
   const prioClass = `prio-${(os.prioridade || 'normal').toLowerCase()}`;
   const numOsFormatted = os.numero_os ? `OS #${os.numero_os}` : `OS #${String(os.id_os_chamados || '').substring(0, 8).toUpperCase()}`;
