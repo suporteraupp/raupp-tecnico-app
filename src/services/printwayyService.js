@@ -171,37 +171,12 @@ export function getPrintwayyDataBySerial(equipamento = {}, os = {}) {
   // 2. Detecção se é uma impressora Colorida
   const isColor = isColorPrinter(eq, osObj, serial);
 
-  // 3. Se não houver dados no banco para essa impressora, gera a simulação atrelada ao serial
+  // 3. Se não houver dados reais registrados no banco ou via API, não inventar porcentagens fictícias
   if (!isRealData) {
-    if (isColor) {
-      const uniqueKey = serial ? `PRINTWAYY_COLOR_SN_${serial}` : `PRINTWAYY_COLOR_EQ_${eq.id_equipamentos || eq.id || osObj.id_os_chamados || ''}`;
-      let hash = 0;
-      for (let i = 0; i < uniqueKey.length; i++) {
-        hash = (hash * 31 + uniqueKey.charCodeAt(i)) % 10007;
-      }
-
-      const isCritico = (hash % 7 === 0);
-      bk = isCritico ? Math.max(5, (hash % 12) + 4) : Math.max(16, ((hash * 7) % 70) + 20);
-      c = Math.max(14, ((hash * 13) % 72) + 16);
-      m = Math.max(10, ((hash * 17) % 68) + 12);
-      y = Math.max(18, ((hash * 23) % 76) + 18);
-
-      statusSuprimento = (bk <= 15 || c <= 15 || m <= 15 || y <= 15) ? 'critico' : ((bk <= 30 || c <= 30 || m <= 30 || y <= 30) ? 'atencao' : 'ok');
-    } else {
-      const uniqueKey = serial ? `PRINTWAYY_MONO_SN_${serial}` : `PRINTWAYY_MONO_EQ_${eq.id_equipamentos || eq.id || osObj.id_os_chamados || ''}`;
-      let hash = 0;
-      for (let i = 0; i < uniqueKey.length; i++) {
-        hash = (hash * 31 + uniqueKey.charCodeAt(i)) % 10007;
-      }
-
-      const isCritico = (hash % 7 === 0);
-      bk = isCritico ? Math.max(5, (hash % 12) + 4) : Math.max(16, ((hash * 7) % 70) + 20);
-      c = null;
-      m = null;
-      y = null;
-
-      statusSuprimento = isCritico || bk <= 15 ? 'critico' : (bk <= 30 ? 'atencao' : 'ok');
-    }
+    bk = null;
+    c = null;
+    m = null;
+    y = null;
   }
 
   return {
