@@ -5,14 +5,14 @@
  * contadores e níveis de suprimentos de forma nativa e em tempo real.
  */
 
-const PRINTWAYY_API_KEY = import.meta.env.VITE_PRINTWAYY_API_KEY || '7E12C7B3-FBEB-42CB-8C75-7E25E99EAACA';
+const PRINTWAYY_API_KEY = import.meta.env.VITE_PRINTWAYY_API_KEY || '';
 
 /**
  * Consulta a API do Printwayy buscando dados reais de suprimento pelo Número de Série.
  */
 export const fetchPrintwayyDataBySerial = async (serialNumber) => {
-  if (!serialNumber) return null;
-  const cleanSerial = String(serialNumber).trim().toUpperCase();
+  if (!serialNumber || !PRINTWAYY_API_KEY) return null;
+  const cleanSerial = encodeURIComponent(String(serialNumber).trim().toUpperCase());
 
   const headers = {
     'Accept': 'application/json',
@@ -39,7 +39,7 @@ export const fetchPrintwayyDataBySerial = async (serialNumber) => {
           return data;
         }
       }
-    } catch (err) {
+    } catch {
       // Ignora falha de endpoint individual
     }
   }

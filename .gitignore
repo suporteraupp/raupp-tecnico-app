@@ -12,10 +12,8 @@ dist
 dist-ssr
 # Environment variables
 .env
-.env.example
-api.js
-estoqueApi.js
-.env*.local
+.env.*
+!.env.example
 
 # Editor directories and files
 .vscode/*

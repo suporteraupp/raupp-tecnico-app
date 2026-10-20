@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { SupplyLevelBadge } from './SupplyLevelBadge';
-import { getSerialNumber } from '../services/printwayyService';
 import { extractPrinterInfo } from '../domain/equipamentos/brandDetector';
 
 export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpenHistory }) {

@@ -11,7 +11,7 @@ function formatSyncDate(dateStr) {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return null;
     return `${d.toLocaleDateString('pt-BR')} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -19,9 +19,12 @@ function formatSyncDate(dateStr) {
 /**
  * Componente visual elegante para exibição dos níveis de tinta/toner do Printwayy.
  */
-export function SupplyLevelBadge({ equipamento, os, compact = false }) {
-  if (!equipamento && !os) return null;
+export function SupplyLevelBadge(props) {
+  if (!props.equipamento && !props.os) return null;
+  return <SupplyLevelBadgeContent {...props} />;
+}
 
+function SupplyLevelBadgeContent({ equipamento, os, compact = false }) {
   const initialPwData = getPrintwayyDataBySerial(equipamento, os);
   const [pwData, setPwData] = useState(initialPwData);
 

@@ -29,7 +29,7 @@ Aplicativo web responsivo voltado para técnicos de campo da **Raupp Soluções 
 
 ## 🛠️ Tecnologias Utilizadas
 
-- **Frontend:** React 18, Vite.
+- **Frontend:** React 19, Vite 8.
 - **Estilização:** Vanilla CSS3 moderno (Dark Mode, Glassmorphism, Design Responsivo Mobile-First).
 - **Ícones & Fontes:** FontAwesome 6, Google Fonts (Inter).
 - **Backend & Database:** Supabase JS Client, PostgreSQL (`os_chamados`, `parceiros`, `parceiros_localizacao`, `equipamentos`).
@@ -91,6 +91,7 @@ raupp-tecnico-app/
 ## 🔒 Variáveis de Ambiente (`.env`)
 
 ```env
-VITE_SUPABASE_URL=https://hvwdcsdbqpuqnsacqdpb.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1...
+VITE_SUPABASE_URL=https://SEU-PROJETO.supabase.co
+VITE_SUPABASE_ANON_KEY=sua-anon-key
+VITE_PRINTWAYY_API_KEY=sua-chave-printwayy
 ```
