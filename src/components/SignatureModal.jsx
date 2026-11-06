@@ -19,8 +19,12 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
   useEffect(() => {
     // Carrega peças disponíveis na maleta do técnico
     async function loadItems() {
-      const items = await getEstoqueVolante();
-      setEstoqueVolante(items.filter(i => i.quantidade > 0));
+      try {
+        const items = await getEstoqueVolante();
+        setEstoqueVolante((items || []).filter(i => i.quantidade > 0));
+      } catch (err) {
+        console.warn('Erro ao carregar maleta:', err);
+      }
     }
     loadItems();
   }, []);
@@ -31,21 +35,26 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
       return;
     }
 
-    const pecaObj = estoqueVolante.find(p => p.id === selectedPecaId);
+    const pecaObj = estoqueVolante.find(p => String(p.id) === String(selectedPecaId));
     if (!pecaObj) return;
 
     const qtd = parseInt(qtdPecaUsada) || 1;
-    if (qtd > pecaObj.quantidade) {
+    if (qtd < 1) {
+      showToast('Informe uma quantidade válida.', 'warning');
+      return;
+    }
+    const jaAdicionada = pecasUtilizadas.find(p => String(p.id) === String(pecaObj.id))?.qtdUtilizada || 0;
+    if (qtd + jaAdicionada > pecaObj.quantidade) {
       showToast(`Você possui apenas ${pecaObj.quantidade} unidades de ${pecaObj.nome} na maleta.`, 'warning');
       return;
     }
 
     // Se já estiver na lista, apenas soma a quantidade
-    const idx = pecasUtilizadas.findIndex(p => p.id === selectedPecaId);
+    const idx = pecasUtilizadas.findIndex(p => String(p.id) === String(pecaObj.id));
     if (idx !== -1) {
-      const novasList = [...pecasUtilizadas];
-      novasList[idx].qtdUtilizada += qtd;
-      setPecasUtilizadas(novasList);
+      setPecasUtilizadas(pecasUtilizadas.map((p, i) =>
+        i === idx ? { ...p, qtdUtilizada: p.qtdUtilizada + qtd } : p
+      ));
     } else {
       setPecasUtilizadas([
         ...pecasUtilizadas,
@@ -66,6 +75,9 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
   const handleRemovePecaOS = (id) => {
     setPecasUtilizadas(pecasUtilizadas.filter(p => p.id !== id));
   };
+
+  const hasSignatureRef = useRef(false);
+  useEffect(() => { hasSignatureRef.current = hasSignature; }, [hasSignature]);
 
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -94,14 +106,14 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    if (tempImgData && hasSignature) {
+    if (tempImgData && hasSignatureRef.current) {
       const img = new Image();
       img.onload = () => {
         ctx.drawImage(img, 0, 0);
       };
       img.src = tempImgData;
     }
-  }, [hasSignature]);
+  }, []);
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -203,18 +215,22 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
 
       const laudoCompleto = `${laudoSanitizado}${resumoPecasText}\n---ASSINATURA---\n${signatureBase64}`;
 
-      // Dá baixa automática no estoque volante
-      if (pecasUtilizadas.length > 0) {
-        const clienteNome = os.parceiro?.nome_principal || os.solicitante_nome || 'Cliente';
-        await darBaixaPecasOS(os.numero_os, clienteNome, pecasUtilizadas);
-      }
-
+      // 1º conclui a OS; só depois dá baixa no estoque (evita baixa sem OS concluída / baixa duplicada)
       await onSubmit({
         status_chamado: 'concluido',
         laudo_tecnico: laudoCompleto,
         contador_pb_atendimento: contadorPb ? parseInt(contadorPb) : undefined,
         contador_cor_atendimento: contadorCor ? parseInt(contadorCor) : undefined
       });
+
+      if (pecasUtilizadas.length > 0) {
+        try {
+          const clienteNome = os.parceiro?.nome_principal || os.solicitante_nome || 'Cliente';
+          await darBaixaPecasOS(os.numero_os, clienteNome, pecasUtilizadas);
+        } catch (err) {
+          showToast(`OS concluída, mas houve erro ao baixar o estoque: ${err.message || err}`, 'warning');
+        }
+      }
     } catch (err) {
       showToast(err.message || 'Erro ao finalizar chamado.', 'error');
     } finally {
@@ -230,7 +246,7 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
             <i className="fa-solid fa-signature" style={{ color: '#60a5fa', marginRight: '8px' }}></i>
             Finalizar Ordem de Serviço
           </h3>
-          <button className="modal-close-icon" onClick={onClose}>&times;</button>
+          <button className="modal-close-icon" onClick={onClose} disabled={loading}>&times;</button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -355,6 +371,7 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
               <canvas
                 ref={canvasRef}
                 className="signature-canvas-element"
+                style={{ touchAction: 'none' }}
                 onTouchStart={handleStart}
                 onTouchMove={handleMove}
                 onTouchEnd={handleEnd}
@@ -382,6 +399,7 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
               type="button"
               className="btn-mobile"
               onClick={onClose}
+              disabled={loading}
               style={{ flex: 1, background: 'rgba(148, 163, 184, 0.2)', color: '#cbd5e1' }}
             >
               Cancelar

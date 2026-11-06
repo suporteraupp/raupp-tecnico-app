@@ -70,7 +70,13 @@ export function TechMaleta({ showToast }) {
       showToast('Por favor, informe a descrição da peça.', 'warning');
       return;
     }
-    await cadastrarNovaPeca(newPeca);
+    try {
+      await cadastrarNovaPeca(newPeca);
+    } catch (err) {
+      showToast(err.message || 'Erro ao cadastrar peça.', 'error');
+      await carregarDados();
+      return;
+    }
     showToast('Nova peça adicionada à maleta do técnico!', 'success');
     setShowAddModal(false);
     setNewPeca({
@@ -92,15 +98,20 @@ export function TechMaleta({ showToast }) {
       return;
     }
 
-    const peca = estoque.find(p => p.id === solicitarData.pecaId);
+    const peca = estoque.find(p => String(p.id) === String(solicitarData.pecaId));
     if (!peca) return;
 
-    await criarSolicitacaoReposicao(
-      peca.id,
-      peca.nome,
-      solicitarData.quantidade,
-      solicitarData.observacao
-    );
+    try {
+      await criarSolicitacaoReposicao(
+        peca.id,
+        peca.nome,
+        solicitarData.quantidade,
+        solicitarData.observacao
+      );
+    } catch (err) {
+      showToast(err.message || 'Erro ao enviar solicitação.', 'error');
+      return;
+    }
 
     showToast(`Solicitação de ${solicitarData.quantidade}x ${peca.nome} enviada ao almoxarifado!`, 'success');
     setShowReposicaoModal(false);
@@ -110,14 +121,15 @@ export function TechMaleta({ showToast }) {
 
   // Filtragem
   const filteredEstoque = estoque.filter(item => {
+    const term = searchTerm.toLowerCase();
     const matchSearch =
-      item.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.compatibilidade.toLowerCase().includes(searchTerm.toLowerCase());
+      (item.nome || '').toLowerCase().includes(term) ||
+      (item.codigo || '').toLowerCase().includes(term) ||
+      (item.compatibilidade || '').toLowerCase().includes(term);
 
     const matchCategory =
       categoryFilter === 'todos' ||
-      item.categoria.toLowerCase() === categoryFilter.toLowerCase();
+      (item.categoria || '').toLowerCase() === categoryFilter.toLowerCase();
 
     return matchSearch && matchCategory;
   });

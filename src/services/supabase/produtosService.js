@@ -109,9 +109,11 @@ export const atualizarQuantidadePeca = async (pecaId, delta, motivo = 'Ajuste ma
       query = query.eq('codigo_sku', peca.codigo);
     }
 
-    await query;
+    const { error } = await query;
+    if (error) throw error;
   } catch (err) {
     console.warn('Erro ao atualizar produto no Supabase:', err);
+    throw new Error('Não foi possível salvar o estoque no servidor: ' + (err.message || err));
   }
 
   return pecas[index];
@@ -157,13 +159,15 @@ export const cadastrarNovaPeca = async (dadosPeca) => {
       .insert(payload)
       .select();
 
-    if (!error && data && data.length > 0) {
+    if (error) throw error;
+    if (data && data.length > 0) {
       novaPecaLocal.id = data[0].id_produtos;
       pecas[0].id = data[0].id_produtos;
       salvarEstoqueCache(pecas);
     }
   } catch (err) {
     console.warn('Erro ao cadastrar peça no Supabase:', err);
+    throw new Error('Não foi possível cadastrar a peça no servidor: ' + (err.message || err));
   }
 
   return novaPecaLocal;
@@ -173,6 +177,7 @@ export const darBaixaPecasOS = async (osNumero, clienteNome, pecasUtilizadas) =>
   if (!pecasUtilizadas || pecasUtilizadas.length === 0) return;
 
   const pecas = await getEstoqueVolante();
+  const falhas = [];
 
   for (const pu of pecasUtilizadas) {
     const idx = pecas.findIndex(item => String(item.id) === String(pu.id) || item.codigo === pu.codigo);
@@ -201,14 +206,19 @@ export const darBaixaPecasOS = async (osNumero, clienteNome, pecasUtilizadas) =>
           query = query.eq('codigo_sku', pecas[idx].codigo);
         }
 
-        await query;
+        const { error } = await query;
+        if (error) throw error;
       } catch (err) {
         console.warn('Erro ao dar baixa em produto:', err);
+        falhas.push(pecas[idx].nome);
       }
     }
   }
 
   salvarEstoqueCache(pecas);
+  if (falhas.length > 0) {
+    throw new Error('Falha ao baixar no servidor: ' + falhas.join(', '));
+  }
 };
 
 export const getSolicitacoesReposicao = async () => {
