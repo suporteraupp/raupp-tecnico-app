@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getToken, getUser, removeToken } from '../services/supabase/client';
+import { supabase, getToken, getUser, removeToken, ensureAuthSession } from '../services/supabase/client';
 import { apiLogin, apiSignUp } from '../services/supabase/authService';
 
 const AuthContext = createContext(null);
@@ -9,12 +9,30 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = getToken();
-    const u = getUser();
-    if (token && u) {
-      setUser(u);
-    }
-    setLoading(false);
+    let active = true;
+    (async () => {
+      const token = getToken();
+      const u = getUser();
+      if (token && u) {
+        const session = await ensureAuthSession();
+        if (!active) return;
+        if (session) setUser(u);
+        else removeToken();
+      }
+      if (active) setLoading(false);
+    })();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
+        localStorage.removeItem('raupp_tech_token');
+        localStorage.removeItem('raupp_tech_user');
+        setUser(null);
+      }
+    });
+    return () => {
+      active = false;
+      sub?.subscription?.unsubscribe();
+    };
   }, []);
 
   const login = useCallback(async (usuario, password) => {
