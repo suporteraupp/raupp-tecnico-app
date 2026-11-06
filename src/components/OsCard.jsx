@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { SupplyLevelBadge } from './SupplyLevelBadge';
 import { extractPrinterInfo } from '../domain/equipamentos/brandDetector';
 
 export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpenHistory }) {
@@ -82,7 +81,6 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
             {os.prioridade === 'Alta' && '⚡ '}
             {os.prioridade || 'Normal'}
           </span>
-          <SupplyLevelBadge equipamento={equip} os={os} compact={true} />
         </div>
 
         <button
@@ -262,7 +260,6 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
             )}
           </div>
 
-          <SupplyLevelBadge equipamento={equip} os={os} />
 
           {os.solicitante_nome && (
 

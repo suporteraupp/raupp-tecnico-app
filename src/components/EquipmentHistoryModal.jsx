@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetchHistoricoEquipamento } from '../services/supabase/chamadosService';
-import { SupplyLevelBadge } from './SupplyLevelBadge';
 
 export function EquipmentHistoryModal({ equipamentoId, equipamentoLabel, numeroSerie, onClose }) {
   const [history, setHistory] = useState([]);
@@ -21,7 +20,6 @@ export function EquipmentHistoryModal({ equipamentoId, equipamentoLabel, numeroS
     loadHistory();
   }, [equipamentoId]);
 
-  const equip = history.length > 0 && history[0].equipamento ? history[0].equipamento : null;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -47,7 +45,6 @@ export function EquipmentHistoryModal({ equipamentoId, equipamentoLabel, numeroS
           </button>
         </div>
 
-        {equip && <SupplyLevelBadge equipamento={equip} />}
 
 
         <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>

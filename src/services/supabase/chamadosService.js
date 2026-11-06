@@ -53,6 +53,7 @@ export const apiFetchChamados = async () => {
       supabase.from('equipamentos').select('*')
     ]);
 
+    if (osRes.error) throw osRes.error;
     const osList = osRes.data || [];
 
     const parceirosMap = {};
@@ -92,7 +93,7 @@ export const apiFetchChamados = async () => {
     });
   } catch (err) {
     console.warn('Erro ao buscar chamados no Supabase:', err);
-    return [];
+    throw new Error('Não foi possível carregar as Ordens de Serviço: ' + (err.message || err));
   }
 };
 
@@ -157,41 +158,5 @@ export const apiAtualizarStatusChamado = async (id, payload) => {
   } catch (err) {
     console.warn('Erro ao atualizar no Supabase:', err);
     throw new Error(err.message || 'Falha ao atualizar Ordem de Serviço no Supabase.');
-  }
-};
-
-export const apiAtualizarSuprimentosPrintwayy = async (equipamentoId, osId, supplies) => {
-  try {
-    await ensureAuthSession();
-    const payload = {
-      toner_black: supplies.black ?? null,
-      toner_cyan: supplies.cyan ?? null,
-      toner_magenta: supplies.magenta ?? null,
-      toner_yellow: supplies.yellow ?? null,
-      printwayy_last_sync: new Date().toISOString()
-    };
-
-    if (equipamentoId) {
-      const { error: eqErr } = await supabase
-        .from('equipamentos')
-        .update(payload)
-        .eq('id_equipamentos', equipamentoId);
-
-      if (!eqErr) return { success: true };
-    }
-
-    if (osId) {
-      const { error: osErr } = await supabase
-        .from('os_chamados')
-        .update(payload)
-        .eq('id_os_chamados', osId);
-
-      if (!osErr) return { success: true };
-    }
-
-    return { success: true, localOnly: true };
-  } catch (err) {
-    console.warn('Erro ao salvar suprimentos no Supabase:', err);
-    return { success: false, error: err };
   }
 };

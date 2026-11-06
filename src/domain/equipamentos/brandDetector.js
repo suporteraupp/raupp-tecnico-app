@@ -1,4 +1,4 @@
-import { getSerialNumber } from '../../services/printwayyService';
+import { getSerialNumber } from './serialNumber';
 
 export const detectBrand = (str = '') => {
   const s = str.toLowerCase();

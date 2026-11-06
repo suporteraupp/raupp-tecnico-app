@@ -93,5 +93,4 @@ raupp-tecnico-app/
 ```env
 VITE_SUPABASE_URL=https://SEU-PROJETO.supabase.co
 VITE_SUPABASE_ANON_KEY=sua-anon-key
-VITE_PRINTWAYY_API_KEY=sua-chave-printwayy
 ```
