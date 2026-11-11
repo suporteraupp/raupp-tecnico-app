@@ -2,6 +2,18 @@ import { supabase, setToken, setUser } from './client';
 
 const USER_EMAIL_MAP_KEY = 'raupp_tech_user_map';
 
+// Diretório inicial sincronizado da tabela `profiles` do banco (para funcionar mesmo com RLS bloqueando leitura anônima antes do 1º login)
+const INITIAL_PROFILES_DIRECTORY = [
+  { usuario: 't.moreira', nome_completo: 'Tiago Moreira', email_recuperacao: 'tiago@rauppsolucoes.com.br' },
+  { usuario: 'a.severo', nome_completo: 'Anderson Luiz Estanislau Severo', email_recuperacao: 'a.severo.rgt@gmail.com' },
+  { usuario: 'Kayke.José', nome_completo: 'Kayke José Evangelista Dos Santos', email_recuperacao: 'Kaykeevangelista0@gmail.com' },
+  { usuario: 'Kelvin.Ribeiro', nome_completo: 'Kelvin.Ribeiro', email_recuperacao: 'tecnico@raupp.com.br' },
+  { usuario: 'kayke', nome_completo: 'kayke', email_recuperacao: 'kayke@raupp.com.br' },
+  { usuario: 'Tiago', nome_completo: 'Tiago', email_recuperacao: 'tiago@raupp.com.br' },
+  { usuario: 'Kayketeste', nome_completo: 'Kayketeste', email_recuperacao: 'kayketeste@raupp.com.br' },
+  { usuario: 'kayke.jose', nome_completo: 'Kayke.José', email_recuperacao: 'kayke.jose@raupp.com.br' }
+];
+
 const normalizeUsername = (input) => {
   return (input || '')
     .trim()
@@ -15,40 +27,163 @@ const formatEmail = (input) => {
   if (!clean) return '';
   if (clean.includes('@')) return clean.toLowerCase();
   const normalized = normalizeUsername(clean);
-  return `${normalized}@raupp.com.br`;
+  return `${normalized}@rauppsolucoes.com.br`;
+};
+
+const buildSeedUserEmailMap = () => {
+  const seedMap = {};
+  INITIAL_PROFILES_DIRECTORY.forEach((p) => {
+    const email = (p.email_recuperacao || '').trim().toLowerCase();
+    if (!email) return;
+    [p.usuario, p.nome_completo].forEach((alias) => {
+      if (!alias) return;
+      const rawKey = alias.trim().toLowerCase();
+      const normKey = normalizeUsername(alias);
+      if (rawKey && !seedMap[rawKey]) seedMap[rawKey] = email;
+      if (normKey && !seedMap[normKey]) seedMap[normKey] = email;
+    });
+  });
+  return seedMap;
 };
 
 const getLocalUserEmailMap = () => {
+  const seedMap = buildSeedUserEmailMap();
   try {
     const raw = localStorage.getItem(USER_EMAIL_MAP_KEY);
-    return raw ? JSON.parse(raw) : {};
+    const storedMap = raw ? JSON.parse(raw) : {};
+    return { ...seedMap, ...storedMap };
   } catch {
-    return {};
+    return seedMap;
   }
 };
 
-const saveLocalUserEmailMapping = (username, email) => {
+const saveLocalUserEmailMapping = (aliasesInput, email) => {
   if (!email) return;
   try {
     const map = getLocalUserEmailMap();
     const cleanEmail = email.trim().toLowerCase();
     const emailPrefix = cleanEmail.split('@')[0];
 
-    if (emailPrefix) {
-      map[emailPrefix] = cleanEmail;
-      map[normalizeUsername(emailPrefix)] = cleanEmail;
-    }
+    const aliases = Array.isArray(aliasesInput) ? aliasesInput : [aliasesInput];
+    if (emailPrefix) aliases.push(emailPrefix);
 
-    if (username) {
-      const rawKey = username.trim().toLowerCase();
-      const normKey = normalizeUsername(username);
+    aliases.forEach((alias) => {
+      if (!alias || typeof alias !== 'string') return;
+      const rawKey = alias.trim().toLowerCase();
+      const normKey = normalizeUsername(alias);
+
       if (rawKey && !rawKey.includes('@')) map[rawKey] = cleanEmail;
       if (normKey && !normKey.includes('@')) map[normKey] = cleanEmail;
-    }
+
+      const tokens = normKey.split(/[\s._-]+/).filter(Boolean);
+      if (tokens.length > 0) {
+        const firstToken = tokens[0];
+        if (firstToken.length >= 3 && !map[firstToken]) {
+          map[firstToken] = cleanEmail;
+        }
+        // Gera automaticamente o formato inicial.sobrenome (ex: "Tiago Moreira" -> "t.moreira")
+        if (tokens.length >= 2) {
+          const lastToken = tokens[tokens.length - 1];
+          const secondToken = tokens[1];
+          const initLast = `${firstToken[0]}.${lastToken}`;
+          const initSecond = `${firstToken[0]}.${secondToken}`;
+          const fullDot = `${firstToken}.${lastToken}`;
+          map[initLast] = cleanEmail;
+          map[initSecond] = cleanEmail;
+          map[fullDot] = cleanEmail;
+        }
+      }
+    });
 
     localStorage.setItem(USER_EMAIL_MAP_KEY, JSON.stringify(map));
   } catch {
     // Ignora falha de escrita no localStorage
+  }
+};
+
+/**
+ * Sincroniza o perfil do usuário autenticado e o diretório de técnicos da tabela `profiles`
+ * para que o login por nome de usuário funcione imediatamente após qualquer sessão ativa.
+ */
+export const syncUserProfileCache = async () => {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const authUser = sessionData?.session?.user;
+    if (!authUser?.email) return null;
+
+    const meta = authUser.user_metadata || {};
+    const metaUsername =
+      meta.usuario || meta.username || meta.user_name || meta.login || '';
+    const metaFullName =
+      meta.nome_completo || meta.full_name || meta.nome || meta.name || '';
+    const emailPrefix = authUser.email.split('@')[0] || 'tecnico';
+
+    let profileUsername = metaUsername || emailPrefix;
+    let profileDisplayName = metaFullName || metaUsername || emailPrefix;
+
+    const { data: allProfiles } = await supabase
+      .from('profiles')
+      .select('id_profiles, usuario, nome_completo, email_recuperacao')
+      .limit(100);
+
+    if (Array.isArray(allProfiles)) {
+      allProfiles.forEach((p) => {
+        const pEmail = (p.email_recuperacao || '').trim().toLowerCase();
+        if (pEmail && pEmail.includes('@')) {
+          saveLocalUserEmailMapping([p.usuario, p.nome_completo], pEmail);
+        }
+      });
+    }
+
+    const ownProfile = Array.isArray(allProfiles)
+      ? allProfiles.find(
+          (p) =>
+            String(p.id_profiles) === String(authUser.id) ||
+            (p.email_recuperacao &&
+              p.email_recuperacao.trim().toLowerCase() === authUser.email.toLowerCase())
+        )
+      : null;
+
+    if (ownProfile) {
+      profileUsername = ownProfile.usuario || profileUsername;
+      profileDisplayName = ownProfile.nome_completo || ownProfile.usuario || profileDisplayName;
+
+      if (!ownProfile.email_recuperacao || !ownProfile.usuario) {
+        await supabase
+          .from('profiles')
+          .update({
+            usuario: ownProfile.usuario || normalizeUsername(profileUsername),
+            email_recuperacao: authUser.email,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id_profiles', ownProfile.id_profiles);
+      }
+    } else {
+      await supabase.from('profiles').upsert({
+        id_profiles: authUser.id,
+        nome_completo: profileDisplayName,
+        usuario: normalizeUsername(profileUsername),
+        email_recuperacao: authUser.email,
+        role: 'tecnico',
+        updated_at: new Date().toISOString()
+      });
+    }
+
+    saveLocalUserEmailMapping(
+      [profileUsername, profileDisplayName, metaUsername, metaFullName, emailPrefix],
+      authUser.email
+    );
+
+    const updatedUserObj = {
+      id: authUser.id,
+      usuario: profileUsername,
+      nome: profileDisplayName || 'Técnico',
+      email: authUser.email
+    };
+    setUser(updatedUserObj);
+    return updatedUserObj;
+  } catch {
+    return null;
   }
 };
 
@@ -58,63 +193,71 @@ const saveLocalUserEmailMapping = (username, email) => {
  */
 const resolveCandidateEmails = async (identifier) => {
   const clean = (identifier || '').trim();
-  if (!clean) return [];
+  if (!clean) return { emails: [], resolvedFromDirectory: false };
 
   const candidates = new Set();
 
-  // 1. Se digitou um e-mail completo (contém @), tenta ele em primeiro lugar
+  // 1. Se digitou um e-mail completo (contém @), tenta ele diretamente
   if (clean.includes('@')) {
     candidates.add(clean.toLowerCase());
-    return Array.from(candidates);
+    return { emails: Array.from(candidates), resolvedFromDirectory: true };
   }
 
   const lowerUser = clean.toLowerCase();
   const normUser = normalizeUsername(clean);
 
-  // 2. Tenta resolver via RPC (se existir função security definer) ou diretamente na tabela `profiles`
-  try {
-    const { data: rpcEmail } = await supabase.rpc('get_email_by_username', {
-      p_username: clean
-    });
-    if (typeof rpcEmail === 'string' && rpcEmail.includes('@')) {
-      candidates.add(rpcEmail.trim().toLowerCase());
-    }
-  } catch {
-    // RPC opcional
+  // 2. Consulta o mapa local de usuários já autenticados/cadastrados no dispositivo (prioridade máxima)
+  const localMap = getLocalUserEmailMap();
+  if (localMap[lowerUser]) candidates.add(localMap[lowerUser]);
+  if (localMap[normUser]) candidates.add(localMap[normUser]);
+
+  if (candidates.size > 0) {
+    return { emails: Array.from(candidates), resolvedFromDirectory: true };
   }
 
+  // 3. Tenta consultar diretamente na tabela `profiles` (caso RLS permita leitura)
   try {
     const { data: profilesByUser } = await supabase
       .from('profiles')
-      .select('*')
-      .or(`usuario.ilike.${clean},usuario.ilike.${normUser},nome_completo.ilike.${clean}`)
+      .select('usuario, nome_completo, email_recuperacao')
+      .or(`usuario.ilike.*${clean}*,usuario.ilike.*${normUser}*,nome_completo.ilike.*${clean}*`)
       .limit(5);
 
     if (Array.isArray(profilesByUser)) {
       profilesByUser.forEach((p) => {
-        const emailRec = (p.email_recuperacao || p.email || '').trim().toLowerCase();
+        const emailRec = (p.email_recuperacao || '').trim().toLowerCase();
         if (emailRec && emailRec.includes('@')) {
           candidates.add(emailRec);
         }
       });
     }
   } catch {
-    // Caso RLS bloqueie SELECT anônimo na tabela profiles, segue para os próximos métodos
+    // Caso RLS bloqueie SELECT anônimo na tabela profiles
   }
 
-  // 3. Consulta o mapa local de usuários já autenticados/cadastrados no dispositivo
-  const localMap = getLocalUserEmailMap();
-  if (localMap[lowerUser]) candidates.add(localMap[lowerUser]);
-  if (localMap[normUser]) candidates.add(localMap[normUser]);
+  // 4. Tenta resolver via RPC (apenas se ainda não encontrou e se a RPC não retornou 404 nesta sessão)
+  if (candidates.size === 0 && sessionStorage.getItem('raupp_rpc_username_missing') !== '1') {
+    try {
+      const { data: rpcEmail, error: rpcError } = await supabase.rpc('get_email_by_username', {
+        p_username: clean
+      });
+      if (rpcError && (rpcError.code === 'PGRST202' || /404|not found|could not find/i.test(rpcError.message || ''))) {
+        sessionStorage.setItem('raupp_rpc_username_missing', '1');
+      } else if (typeof rpcEmail === 'string' && rpcEmail.includes('@')) {
+        candidates.add(rpcEmail.trim().toLowerCase());
+      }
+    } catch {
+      sessionStorage.setItem('raupp_rpc_username_missing', '1');
+    }
+  }
 
-  // 4. Fallbacks corporativos (@raupp.com.br)
+  if (candidates.size > 0) {
+    return { emails: Array.from(candidates), resolvedFromDirectory: true };
+  }
+
+  // 5. Fallback corporativo padrão (@raupp.com.br)
   candidates.add(formatEmail(clean));
-  if (clean.includes(' ')) {
-    candidates.add(`${normUser.replace(/\s+/g, '.')}@raupp.com.br`);
-    candidates.add(`${normUser.replace(/\s+/g, '')}@raupp.com.br`);
-  }
-
-  return Array.from(candidates).filter(Boolean);
+  return { emails: Array.from(candidates).filter(Boolean), resolvedFromDirectory: false };
 };
 
 export const apiLogin = async (identificador, password) => {
@@ -125,7 +268,7 @@ export const apiLogin = async (identificador, password) => {
     throw new Error('Preencha o usuário ou e-mail e a senha.');
   }
 
-  const candidateEmails = await resolveCandidateEmails(cleanIdentificador);
+  const { emails: candidateEmails, resolvedFromDirectory } = await resolveCandidateEmails(cleanIdentificador);
   let authData = null;
   let lastError = null;
 
@@ -142,7 +285,6 @@ export const apiLogin = async (identificador, password) => {
     }
 
     lastError = error;
-    // Se falhar por rate limit ou e-mail não confirmado, interrompe imediatamente
     if (error?.message && /email not confirmed|too many requests|rate limit/i.test(error.message)) {
       break;
     }
@@ -152,7 +294,10 @@ export const apiLogin = async (identificador, password) => {
     const rawMsg = lastError?.message || '';
     let translatedMsg = 'Usuário/E-mail ou senha incorretos.';
 
-    if (/invalid login credentials|invalid email or password/i.test(rawMsg)) {
+    if (!cleanIdentificador.includes('@') && !resolvedFromDirectory) {
+      translatedMsg =
+        'Usuário ainda não vinculado neste navegador. Faça login 1 vez usando seu E-MAIL completo (após o 1º acesso, o login só pelo nome de usuário ficará salvo automaticamente).';
+    } else if (/invalid login credentials|invalid email or password/i.test(rawMsg)) {
       translatedMsg = 'Credenciais incorretas! Verifique seu usuário/e-mail e senha.';
     } else if (/email not confirmed/i.test(rawMsg)) {
       translatedMsg = 'Seu e-mail ainda não foi confirmado no Supabase Auth. Verifique a caixa de entrada ou desative "Confirm email" no painel.';
@@ -170,44 +315,21 @@ export const apiLogin = async (identificador, password) => {
     throw authErr;
   }
 
-  // Busca dados complementares no perfil (se disponível) e sincroniza caso ainda não exista
+  // Busca dados complementares no perfil (se disponível) e sincroniza todo o diretório
   const authUser = authData.user;
   const metaUsername = authUser.user_metadata?.usuario || authUser.user_metadata?.nome || '';
   const emailPrefix = authUser.email?.split('@')[0] || 'tecnico';
   const typedUsername = !cleanIdentificador.includes('@') ? cleanIdentificador : '';
 
-  let profileUsername = typedUsername || metaUsername || emailPrefix;
-  let profileDisplayName = metaUsername || typedUsername || emailPrefix;
+  const syncedUser = await syncUserProfileCache();
 
-  try {
-    const { data: profileRow } = await supabase
-      .from('profiles')
-      .select('usuario, nome_completo, email_recuperacao')
-      .eq('id_profiles', authUser.id)
-      .maybeSingle();
+  const profileUsername = syncedUser?.usuario || typedUsername || metaUsername || emailPrefix;
+  const profileDisplayName = syncedUser?.nome || metaUsername || typedUsername || emailPrefix;
 
-    if (profileRow) {
-      profileUsername = profileRow.usuario || profileUsername;
-      profileDisplayName = profileRow.nome_completo || profileRow.usuario || profileDisplayName;
-    } else {
-      // Garante que o perfil exista na tabela profiles com usuario e email_recuperacao vinculados
-      await supabase.from('profiles').upsert({
-        id_profiles: authUser.id,
-        nome_completo: profileDisplayName,
-        usuario: normalizeUsername(profileUsername),
-        email_recuperacao: authUser.email,
-        role: 'tecnico',
-        updated_at: new Date().toISOString()
-      });
-    }
-  } catch {
-    // Tabela profiles opcional ou restrita
-  }
-
-  saveLocalUserEmailMapping(profileUsername, authUser.email);
-  if (typedUsername) {
-    saveLocalUserEmailMapping(typedUsername, authUser.email);
-  }
+  saveLocalUserEmailMapping(
+    [profileUsername, profileDisplayName, typedUsername, metaUsername, emailPrefix],
+    authUser.email
+  );
 
   const userObj = {
     id: authUser.id,

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase, getToken, getUser, removeToken, ensureAuthSession } from '../services/supabase/client';
-import { apiLogin, apiSignUp } from '../services/supabase/authService';
+import { apiLogin, apiSignUp, syncUserProfileCache } from '../services/supabase/authService';
 
 const AuthContext = createContext(null);
 
@@ -16,8 +16,13 @@ export function AuthProvider({ children }) {
       if (token && u) {
         const session = await ensureAuthSession();
         if (!active) return;
-        if (session) setUser(u);
-        else removeToken();
+        if (session) {
+          setUser(u);
+          const synced = await syncUserProfileCache();
+          if (active && synced) setUser(synced);
+        } else {
+          removeToken();
+        }
       }
       if (active) setLoading(false);
     })();
