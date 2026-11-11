@@ -1,20 +1,29 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   getEstoqueVolante,
+  getModelosImpressoras,
   atualizarQuantidadePeca,
+  atualizarCompatibilidadePeca,
   cadastrarNovaPeca,
   getHistoricoMovimentacoes,
   criarSolicitacaoReposicao,
   getSolicitacoesReposicao
 } from '../services/supabase/produtosService';
 
-export function TechMaleta({ showToast }) {
+export function TechMaleta({ showToast, onEstoqueChange }) {
   const [estoque, setEstoque] = useState([]);
+  const [modelosImpressoras, setModelosImpressoras] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('todos');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showReposicaoModal, setShowReposicaoModal] = useState(false);
+  const [editingCompatPeca, setEditingCompatPeca] = useState(null);
+  const [compatEditValue, setCompatEditValue] = useState('');
+  const [selectedMarcaRapida, setSelectedMarcaRapida] = useState('Brother');
+  const [modeloDigitadoRapido, setModeloDigitadoRapido] = useState('');
+
+  const MARCAS_PADRAO = ['Brother', 'Samsung', 'HP', 'Kyocera', 'Ricoh', 'Lexmark', 'Epson', 'Canon'];
 
   // Estados dos Formulários
   const [newPeca, setNewPeca] = useState({
@@ -38,16 +47,23 @@ export function TechMaleta({ showToast }) {
 
   const carregarDados = useCallback(async () => {
     try {
-      const items = await getEstoqueVolante();
+      const [items, modelos, hist, solic] = await Promise.all([
+        getEstoqueVolante(),
+        getModelosImpressoras(),
+        getHistoricoMovimentacoes(),
+        getSolicitacoesReposicao()
+      ]);
       setEstoque(items);
-      const hist = await getHistoricoMovimentacoes();
+      setModelosImpressoras(modelos);
       setHistorico(hist);
-      const solic = await getSolicitacoesReposicao();
       setSolicitacoes(solic);
+      if (onEstoqueChange) {
+        await onEstoqueChange();
+      }
     } catch (err) {
       console.warn('Erro ao carregar dados da maleta:', err);
     }
-  }, []);
+  }, [onEstoqueChange]);
 
   useEffect(() => {
     carregarDados();
@@ -70,15 +86,22 @@ export function TechMaleta({ showToast }) {
       showToast('Por favor, informe a descrição da peça.', 'warning');
       return;
     }
+    const compatFinal = newPeca.compatibilidade.trim() ||
+      (modeloDigitadoRapido.trim() ? `${selectedMarcaRapida} ${modeloDigitadoRapido.trim().toUpperCase()}` : '');
+    if (!compatFinal) {
+      showToast('Vincule ao menos uma Marca e Modelo de impressora (ex: Brother HL-L5102DW).', 'warning');
+      return;
+    }
     try {
-      await cadastrarNovaPeca(newPeca);
+      await cadastrarNovaPeca({ ...newPeca, compatibilidade: compatFinal });
     } catch (err) {
       showToast(err.message || 'Erro ao cadastrar peça.', 'error');
       await carregarDados();
       return;
     }
-    showToast('Nova peça adicionada à maleta do técnico!', 'success');
+    showToast('Nova peça adicionada e vinculada ao modelo com sucesso!', 'success');
     setShowAddModal(false);
+    setModeloDigitadoRapido('');
     setNewPeca({
       codigo: '',
       nome: '',
@@ -117,6 +140,45 @@ export function TechMaleta({ showToast }) {
     setShowReposicaoModal(false);
     setSolicitarData({ pecaId: '', quantidade: '1', observacao: '' });
     await carregarDados();
+  };
+
+  const appendModeloToString = (currentStr, modeloLabel) => {
+    if (!modeloLabel) return currentStr;
+    if (modeloLabel === 'Multimarca') return 'Multimarca';
+    const parts = (currentStr || '')
+      .split('/')
+      .map(s => s.trim())
+      .filter(s => s && s.toLowerCase() !== 'multimarca');
+    if (!parts.some(p => p.toLowerCase() === modeloLabel.toLowerCase())) {
+      parts.push(modeloLabel);
+    }
+    return parts.join(' / ');
+  };
+
+  const removeModeloFromString = (currentStr, modeloToRemove) => {
+    const parts = (currentStr || '')
+      .split('/')
+      .map(s => s.trim())
+      .filter(s => s && s.toLowerCase() !== modeloToRemove.toLowerCase());
+    return parts.join(' / ');
+  };
+
+  const handleOpenEditCompat = (item) => {
+    setEditingCompatPeca(item);
+    setCompatEditValue(item.compatibilidade || 'Multimarca');
+  };
+
+  const handleSaveCompat = async (e) => {
+    e.preventDefault();
+    if (!editingCompatPeca) return;
+    try {
+      await atualizarCompatibilidadePeca(editingCompatPeca.id, compatEditValue);
+      showToast(`Modelo vinculado à peça "${editingCompatPeca.nome}" com sucesso!`, 'success');
+      setEditingCompatPeca(null);
+      await carregarDados();
+    } catch (err) {
+      showToast(err.message || 'Erro ao vincular modelo de impressora.', 'error');
+    }
   };
 
   // Filtragem
@@ -359,10 +421,34 @@ export function TechMaleta({ showToast }) {
                     {item.nome}
                   </h3>
 
-                  <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <i className="fa-solid fa-print" style={{ color: '#64748b' }}></i>
-                    {item.compatibilidade}
-                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '12px', background: 'rgba(255, 255, 255, 0.03)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                    <span style={{ fontSize: '0.78rem', color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '6px', lineHeight: 1.3 }}>
+                      <i className="fa-solid fa-print" style={{ color: '#38bdf8', flexShrink: 0 }}></i>
+                      <span>{item.compatibilidade || 'Multimarca'}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditCompat(item)}
+                      title="Vincular / Alterar Modelo de Impressora"
+                      style={{
+                        background: 'rgba(56, 189, 248, 0.14)',
+                        border: '1px solid rgba(56, 189, 248, 0.35)',
+                        color: '#38bdf8',
+                        borderRadius: '6px',
+                        padding: '3px 8px',
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        flexShrink: 0
+                      }}
+                    >
+                      <i className="fa-solid fa-link"></i> Modelo
+                    </button>
+                  </div>
                 </div>
 
                 {/* Ações Rápidas de Ajuste (+ Entrada / - Baixa) */}
@@ -477,12 +563,120 @@ export function TechMaleta({ showToast }) {
                 </div>
               </div>
 
-              <div className="form-group-field">
-                <label className="form-label-styled">Impressora / Compatibilidade</label>
+              <div className="form-group-field" style={{ background: 'rgba(56, 189, 248, 0.05)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
+                <label className="form-label-styled">
+                  <i className="fa-solid fa-print" style={{ color: '#38bdf8', marginRight: '6px' }}></i>
+                  Marca e Modelo Compatível *
+                </label>
+
+                {/* Vínculo rápido Marca + Modelo (ex: Brother + HL-L5102DW ou Samsung + MF-4070) */}
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                  <select
+                    className="input-styled"
+                    style={{ flex: '1 1 110px', fontSize: '0.82rem' }}
+                    value={selectedMarcaRapida}
+                    onChange={(e) => setSelectedMarcaRapida(e.target.value)}
+                  >
+                    {MARCAS_PADRAO.map(marca => (
+                      <option key={marca} value={marca}>{marca}</option>
+                    ))}
+                  </select>
+
+                  <input
+                    type="text"
+                    className="input-styled"
+                    style={{ flex: '2 1 140px', fontSize: '0.82rem' }}
+                    placeholder="Modelo (ex: HL-L5102DW, MF-4070)"
+                    value={modeloDigitadoRapido}
+                    onChange={(e) => setModeloDigitadoRapido(e.target.value)}
+                  />
+
+                  <button
+                    type="button"
+                    className="btn-mobile"
+                    onClick={() => {
+                      if (!modeloDigitadoRapido.trim()) {
+                        showToast('Digite o código do modelo (ex: HL-L5102DW ou MF-4070).', 'warning');
+                        return;
+                      }
+                      const label = `${selectedMarcaRapida} ${modeloDigitadoRapido.trim().toUpperCase()}`;
+                      setNewPeca({
+                        ...newPeca,
+                        compatibilidade: appendModeloToString(newPeca.compatibilidade, label)
+                      });
+                      setModeloDigitadoRapido('');
+                    }}
+                    style={{ background: '#00a2e8', color: '#fff', padding: '0 14px' }}
+                    title="Adicionar Marca + Modelo"
+                  >
+                    <i className="fa-solid fa-plus"></i>
+                  </button>
+                </div>
+
+                {modelosImpressoras.length > 0 && (
+                  <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                    <select
+                      className="input-styled"
+                      style={{ fontSize: '0.82rem' }}
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setNewPeca({
+                            ...newPeca,
+                            compatibilidade: appendModeloToString(newPeca.compatibilidade, e.target.value)
+                          });
+                        }
+                      }}
+                    >
+                      <option value="">+ Ou escolher modelo já cadastrado no ERP...</option>
+                      {modelosImpressoras.map(m => (
+                        <option key={m.id} value={m.label}>
+                          🖨️ {m.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {newPeca.compatibilidade && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                    {newPeca.compatibilidade.split('/').map(s => s.trim()).filter(Boolean).map(mod => (
+                      <span
+                        key={mod}
+                        style={{
+                          background: 'rgba(56, 189, 248, 0.15)',
+                          border: '1px solid rgba(56, 189, 248, 0.35)',
+                          color: '#38bdf8',
+                          borderRadius: '14px',
+                          padding: '3px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <i className="fa-solid fa-print" style={{ fontSize: '0.7rem' }}></i>
+                        {mod}
+                        <button
+                          type="button"
+                          onClick={() => setNewPeca({
+                            ...newPeca,
+                            compatibilidade: removeModeloFromString(newPeca.compatibilidade, mod)
+                          })}
+                          style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '0.85rem', lineHeight: 1 }}
+                        >
+                          &times;
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 <input
                   type="text"
                   className="input-styled"
-                  placeholder="Ex: HP LaserJet M404 / M428"
+                  placeholder="Modelos vinculados (ex: Brother HL-L5102DW / Samsung MF-4070)"
                   value={newPeca.compatibilidade}
                   onChange={(e) => setNewPeca({ ...newPeca, compatibilidade: e.target.value })}
                 />
@@ -655,6 +849,148 @@ export function TechMaleta({ showToast }) {
                 })
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Vincular / Editar Modelo de Impressora de Peça Existente */}
+      {editingCompatPeca && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-title-row">
+              <h3 className="modal-title">
+                <i className="fa-solid fa-link" style={{ color: '#38bdf8', marginRight: '8px' }}></i>
+                Vincular Modelo de Impressora
+              </h3>
+              <button className="modal-close-icon" onClick={() => setEditingCompatPeca(null)}>&times;</button>
+            </div>
+
+            <div style={{ fontSize: '0.84rem', color: '#94a3b8', marginBottom: '14px' }}>
+              Peça: <strong style={{ color: '#f8fafc' }}>{editingCompatPeca.nome}</strong>{' '}
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>[{editingCompatPeca.codigo}]</span>
+            </div>
+
+            <form onSubmit={handleSaveCompat}>
+              <div className="form-group-field">
+                <label className="form-label-styled">Adicionar Marca + Modelo</label>
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                  <select
+                    className="input-styled"
+                    style={{ flex: '1 1 110px', fontSize: '0.82rem' }}
+                    value={selectedMarcaRapida}
+                    onChange={(e) => setSelectedMarcaRapida(e.target.value)}
+                  >
+                    {MARCAS_PADRAO.map(marca => (
+                      <option key={marca} value={marca}>{marca}</option>
+                    ))}
+                  </select>
+
+                  <input
+                    type="text"
+                    className="input-styled"
+                    style={{ flex: '2 1 140px', fontSize: '0.82rem' }}
+                    placeholder="Modelo (ex: HL-L5102DW, MF-4070)"
+                    value={modeloDigitadoRapido}
+                    onChange={(e) => setModeloDigitadoRapido(e.target.value)}
+                  />
+
+                  <button
+                    type="button"
+                    className="btn-mobile"
+                    onClick={() => {
+                      if (!modeloDigitadoRapido.trim()) {
+                        showToast('Digite o código do modelo (ex: HL-L5102DW ou MF-4070).', 'warning');
+                        return;
+                      }
+                      const label = `${selectedMarcaRapida} ${modeloDigitadoRapido.trim().toUpperCase()}`;
+                      setCompatEditValue(appendModeloToString(compatEditValue, label));
+                      setModeloDigitadoRapido('');
+                    }}
+                    style={{ background: '#00a2e8', color: '#fff', padding: '0 14px' }}
+                    title="Adicionar Marca + Modelo"
+                  >
+                    <i className="fa-solid fa-plus"></i>
+                  </button>
+                </div>
+
+                {modelosImpressoras.length > 0 && (
+                  <select
+                    className="input-styled"
+                    style={{ fontSize: '0.82rem' }}
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setCompatEditValue(appendModeloToString(compatEditValue, e.target.value));
+                      }
+                    }}
+                  >
+                    <option value="">-- Ou escolher modelo cadastrado no ERP --</option>
+                    {modelosImpressoras.map(m => (
+                      <option key={m.id} value={m.label}>
+                        🖨️ {m.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {compatEditValue && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+                  {compatEditValue.split('/').map(s => s.trim()).filter(Boolean).map(mod => (
+                    <span
+                      key={mod}
+                      style={{
+                        background: 'rgba(56, 189, 248, 0.15)',
+                        border: '1px solid rgba(56, 189, 248, 0.35)',
+                        color: '#38bdf8',
+                        borderRadius: '14px',
+                        padding: '4px 10px',
+                        fontSize: '0.76rem',
+                        fontWeight: 600,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <i className="fa-solid fa-print" style={{ fontSize: '0.7rem' }}></i>
+                      {mod}
+                      <button
+                        type="button"
+                        onClick={() => setCompatEditValue(removeModeloFromString(compatEditValue, mod))}
+                        style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1 }}
+                      >
+                        &times;
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="form-group-field">
+                <label className="form-label-styled">Modelos Compatíveis (Texto)</label>
+                <input
+                  type="text"
+                  className="input-styled"
+                  placeholder="Ex: Brother DCP-L5652DN / MFC-L5902DW"
+                  value={compatEditValue}
+                  onChange={(e) => setCompatEditValue(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                <button
+                  type="button"
+                  className="btn-mobile"
+                  onClick={() => setEditingCompatPeca(null)}
+                  style={{ flex: 1, background: 'rgba(148, 163, 184, 0.2)', color: '#cbd5e1' }}
+                >
+                  Cancelar
+                </button>
+                <button type="submit" className="btn-mobile btn-complete" style={{ flex: 1 }}>
+                  <i className="fa-solid fa-check"></i> Salvar Vínculo
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

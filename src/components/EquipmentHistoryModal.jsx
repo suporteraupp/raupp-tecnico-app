@@ -69,6 +69,10 @@ export function EquipmentHistoryModal({ equipamentoId, equipamentoLabel, numeroS
                 const parts = laudoTexto.split('---ASSINATURA---');
                 laudoTexto = parts[0].trim();
                 laudoAssinatura = parts[1] ? parts[1].trim() : null;
+              } else if (laudoTexto.includes('[Assinatura Digital]:')) {
+                const parts = laudoTexto.split('[Assinatura Digital]:');
+                laudoTexto = parts[0].trim();
+                laudoAssinatura = parts[1] ? parts[1].trim() : null;
               }
 
               const statusColor =

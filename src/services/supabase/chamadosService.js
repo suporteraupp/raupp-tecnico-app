@@ -9,6 +9,45 @@ const VALID_OS_COLUMNS = [
   'valor_servico', 'valor_pecas', 'data_abertura', 'data_fechamento', 'updated_at', 'contratos_id'
 ];
 
+const STORAGE_KEY_ALERTAS_EQUIP = 'raupp_tech_alertas_equip';
+
+export const extrairAlertaPreventivoDoLaudo = (laudo = '') => {
+  if (!laudo || !laudo.includes('--- ALERTA PREVENTIVO (PEÇA NO FIM DA VIDA ÚTIL) ---')) {
+    return null;
+  }
+  const afterTag = laudo.split('--- ALERTA PREVENTIVO (PEÇA NO FIM DA VIDA ÚTIL) ---')[1] || '';
+  const cleanBlock = afterTag
+    .split(/--- (?:MEDIDORES|PEÇAS|ASSINATURA)|---ASSINATURA---/)[0]
+    .trim();
+  return cleanBlock || null;
+};
+
+export const salvarAlertaPreventivoLocal = (equipId, serie, textoAlerta) => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_ALERTAS_EQUIP);
+    const map = raw ? JSON.parse(raw) : {};
+    if (equipId) map[`id:${equipId}`] = textoAlerta;
+    if (serie) map[`sn:${String(serie).trim().toUpperCase()}`] = textoAlerta;
+    localStorage.setItem(STORAGE_KEY_ALERTAS_EQUIP, JSON.stringify(map));
+  } catch {
+    // Ignora erro local
+  }
+};
+
+const getAlertaPreventivoLocal = (equipId, serie) => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_ALERTAS_EQUIP);
+    const map = raw ? JSON.parse(raw) : {};
+    if (equipId && map[`id:${equipId}`]) return map[`id:${equipId}`];
+    if (serie && map[`sn:${String(serie).trim().toUpperCase()}`]) {
+      return map[`sn:${String(serie).trim().toUpperCase()}`];
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
 export const apiFetchChamados = async () => {
   try {
     await ensureAuthSession();
@@ -76,6 +115,28 @@ export const apiFetchChamados = async () => {
       if (e.numero_serie) eqMapBySerial[String(e.numero_serie).trim().toUpperCase()] = enriched;
     });
 
+    // Descobre o último alerta preventivo registrado para cada equipamento nas OSs concluídas
+    const alertasPorEquipId = {};
+    const alertasPorSerie = {};
+    const sortedByDate = [...osList].sort((a, b) => {
+      const da = new Date(a.data_fechamento || a.updated_at || a.data_abertura || a.created_at || 0).getTime();
+      const db = new Date(b.data_fechamento || b.updated_at || b.data_abertura || b.created_at || 0).getTime();
+      return db - da;
+    });
+
+    sortedByDate.forEach(item => {
+      const alerta = extrairAlertaPreventivoDoLaudo(item.laudo_tecnico);
+      if (!alerta) return;
+      const eId = item.equipamentos_id ?? item.equipamento_id;
+      const eSerial = item.os_equipamento_serie ? String(item.os_equipamento_serie).trim().toUpperCase() : '';
+      if (eId != null && !alertasPorEquipId[String(eId)]) {
+        alertasPorEquipId[String(eId)] = alerta;
+      }
+      if (eSerial && !alertasPorSerie[eSerial]) {
+        alertasPorSerie[eSerial] = alerta;
+      }
+    });
+
     return osList.map(os => {
       const pId = os.parceiros_id ?? os.parceiro_id;
       const lId = os.parceiros_localizacao_id ?? os.parceiro_localizacao_id;
@@ -83,12 +144,19 @@ export const apiFetchChamados = async () => {
       const eSerial = os.os_equipamento_serie ? String(os.os_equipamento_serie).trim().toUpperCase() : '';
 
       const matchedEq = (eId != null ? eqMapById[String(eId)] : null) || (eSerial ? eqMapBySerial[eSerial] : null);
+      const eqSerial = eSerial || (matchedEq?.numero_serie ? String(matchedEq.numero_serie).trim().toUpperCase() : '');
+
+      const alertaPreventivo =
+        (eId != null ? alertasPorEquipId[String(eId)] : null) ||
+        (eqSerial ? alertasPorSerie[eqSerial] : null) ||
+        getAlertaPreventivoLocal(eId, eqSerial);
 
       return {
         ...os,
         parceiro: os.parceiro || (pId != null ? parceirosMap[String(pId)] : null),
         parceiro_localizacao: os.parceiro_localizacao || (lId != null ? locsMap[String(lId)] : null),
-        equipamento: enrichEquipamento(os.equipamento) || matchedEq
+        equipamento: enrichEquipamento(os.equipamento) || matchedEq,
+        alerta_preventivo: alertaPreventivo || null
       };
     });
   } catch (err) {
@@ -159,4 +227,98 @@ export const apiAtualizarStatusChamado = async (id, payload) => {
     console.warn('Erro ao atualizar no Supabase:', err);
     throw new Error(err.message || 'Falha ao atualizar Ordem de Serviço no Supabase.');
   }
+};
+
+export const apiReabrirChamado = async (osOriginal, motivoAlerta = '') => {
+  await ensureAuthSession();
+
+  const descAtual = String(osOriginal.descricao_problema || '').trim();
+  const alertaExistente = motivoAlerta || osOriginal.alerta_preventivo || '';
+  const prefixoReabertura = alertaExistente
+    ? `[RETORNO PREVENTIVO - LEVAR PEÇA: ${alertaExistente.replace(/^⚠️\s*/, '')}]`
+    : '[CHAMADO REABERTO PELO TÉCNICO PARA RETORNO]';
+
+  const novaDescricao = descAtual.startsWith('[RETORNO PREVENTIVO') || descAtual.startsWith('[CHAMADO REABERTO')
+    ? descAtual
+    : `${prefixoReabertura} ${descAtual}`.trim();
+
+  const updatePayload = {
+    status_chamado: 'aberto',
+    data_fechamento: null,
+    descricao_problema: novaDescricao
+  };
+
+  if (osOriginal.laudo_tecnico) {
+    updatePayload.laudo_tecnico = osOriginal.laudo_tecnico;
+  }
+
+  const { error } = await supabase
+    .from('os_chamados')
+    .update(updatePayload)
+    .eq('id_os_chamados', osOriginal.id_os_chamados);
+
+  if (error) {
+    throw new Error(error.message || 'Não foi possível reabrir o chamado.');
+  }
+
+  return { success: true, mode: 'reopened' };
+};
+
+export const apiCriarChamadoPreventivo = async (osOriginal, pecaAlerta, detalheAlerta, laudoFinalizado = '') => {
+  await ensureAuthSession();
+
+  const numOsRef = osOriginal.numero_os || String(osOriginal.id_os_chamados || '').substring(0, 6).toUpperCase();
+  const descricaoPreventiva = `[PREVENTIVA - LEVAR PEÇA: ${pecaAlerta}] Diagnosticado na OS #${numOsRef} que a peça (${pecaAlerta}) vai durar poucas impressões. ${detalheAlerta ? `Obs: ${detalheAlerta}` : ''}`.trim();
+
+  const origemSegura = String(osOriginal.origem || 'App').trim().slice(0, 10);
+  const foneSeguro = osOriginal.solicitante_telefone
+    ? String(osOriginal.solicitante_telefone).trim().slice(0, 20)
+    : null;
+
+  const novoChamado = {
+    origem: origemSegura,
+    parceiros_id: osOriginal.parceiros_id ?? null,
+    parceiros_localizacao_id: osOriginal.parceiros_localizacao_id ?? null,
+    equipamentos_id: osOriginal.equipamentos_id ?? osOriginal.equipamento?.id_equipamentos ?? null,
+    os_equipamento_descricao: osOriginal.os_equipamento_descricao ?? null,
+    os_equipamento_serie: osOriginal.os_equipamento_serie ?? osOriginal.equipamento?.numero_serie ?? null,
+    tecnico_designado_id: osOriginal.tecnico_designado_id ?? null,
+    contratos_id: osOriginal.contratos_id ?? null,
+    tipo_chamado: osOriginal.tipo_chamado || 'Preventiva',
+    tipo_os: osOriginal.tipo_os ?? null,
+    status_chamado: 'aberto',
+    prioridade: osOriginal.prioridade || 'Alta',
+    solicitante_nome: osOriginal.solicitante_nome || 'Diagnóstico Preventivo do Técnico',
+    solicitante_telefone: foneSeguro,
+    descricao_problema: descricaoPreventiva,
+    laudo_tecnico: `--- ALERTA PREVENTIVO (PEÇA NO FIM DA VIDA ÚTIL) ---\n⚠️ ${pecaAlerta}${detalheAlerta ? ` — ${detalheAlerta}` : ''}`,
+    data_abertura: new Date().toISOString()
+  };
+
+  // Remove chaves nulas/indefinidas para evitar conflitos com defaults do banco
+  const cleanInsert = {};
+  Object.keys(novoChamado).forEach(k => {
+    if (VALID_OS_COLUMNS.includes(k) && novoChamado[k] !== null && novoChamado[k] !== undefined) {
+      cleanInsert[k] = novoChamado[k];
+    }
+  });
+
+  const { data, error } = await supabase
+    .from('os_chamados')
+    .insert(cleanInsert)
+    .select();
+
+  if (!error && data && data.length > 0) {
+    return { ...data[0], mode: 'created' };
+  }
+
+  // Fallback automático: caso o perfil do técnico não tenha permissão de INSERT (RLS) ou
+  // exista restrição adicional na tabela, reabre a própria OS mantendo todo o laudo e histórico
+  return await apiReabrirChamado(
+    {
+      ...osOriginal,
+      laudo_tecnico: laudoFinalizado || osOriginal.laudo_tecnico
+    },
+    `${pecaAlerta}${detalheAlerta ? ` (${detalheAlerta})` : ''}`
+  );
 };

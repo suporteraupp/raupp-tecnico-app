@@ -578,50 +578,11 @@ body {
 .toast-success { background: linear-gradient(135deg, #059669, #10b981); border: 1px solid #34d399; }
 .toast-error { background: linear-gradient(135deg, #ef4444, #dc2626); border: 1px solid #f87171; }
 .toast-warning { background: linear-gradient(135deg, var(--raupp-orange), #d97706); border: 1px solid #fbbf24; }
+.toast-info { background: linear-gradient(135deg, var(--raupp-blue-dark), var(--raupp-blue-primary)); border: 1px solid var(--raupp-blue-light); }
 
 @keyframes slideDown {
   from { transform: translateY(-100%); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
-}
-
-/* Media Queries para Telas Pequenas (< 380px) */
-@media (max-width: 380px) {
-  .tab-navigation {
-    margin: 8px 10px 12px 10px;
-    padding: 4px;
-  }
-
-  .tab-button {
-    padding: 8px 2px;
-    font-size: 0.72rem;
-    gap: 3px;
-  }
-
-  .tab-button span:not(.tab-count-chip) {
-    font-size: 0.7rem;
-  }
-
-  .header-app-name {
-    font-size: 0.98rem;
-  }
-
-  .logo-img {
-    height: 24px;
-  }
-
-  .os-card {
-    margin: 10px 10px;
-    padding: 12px 12px;
-  }
-
-  .actions-grid {
-    gap: 6px;
-  }
-
-  .btn-expand-toggle {
-    min-height: 32px;
-    padding: 6px 12px !important;
-  }
 }
 
 /* Modais responsivos para telas baixas ou modo paisagem */

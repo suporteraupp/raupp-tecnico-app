@@ -1,8 +1,10 @@
-import { supabase } from './client';
+import { supabase, ensureAuthSession } from './client';
+import { detectBrand } from '../../domain/equipamentos/brandDetector';
 
 const STORAGE_KEY_ESTOQUE = 'raupp_tech_maleta_estoque';
 const STORAGE_KEY_HISTORICO = 'raupp_tech_maleta_historico';
 const STORAGE_KEY_SOLICITACOES = 'raupp_tech_maleta_solicitacoes';
+const STORAGE_KEY_MODELOS = 'raupp_tech_maleta_modelos';
 
 const produtoToPeca = (p) => ({
   id: p.id_produtos,
@@ -35,6 +37,7 @@ const salvarEstoqueCache = (items) => {
 
 export const getEstoqueVolante = async () => {
   try {
+    await ensureAuthSession();
     const { data, error } = await supabase
       .from('produtos')
       .select('*')
@@ -50,6 +53,82 @@ export const getEstoqueVolante = async () => {
   }
 
   return getEstoqueCache();
+};
+
+/**
+ * Busca os modelos de impressoras cadastrados no ERP (equipamentos_modelos + equipamentos_marcas + equipamentos)
+ * para vincular peças diretamente aos modelos reais do parque de impressão.
+ */
+export const getModelosImpressoras = async () => {
+  try {
+    await ensureAuthSession();
+    const [marcasRes, modelosRes, equipRes] = await Promise.all([
+      supabase.from('equipamentos_marcas').select('*'),
+      supabase.from('equipamentos_modelos').select('*'),
+      supabase.from('equipamentos').select('marca_id, modelo_id, marca, modelo, nome')
+    ]);
+
+    const marcasMap = {};
+    (marcasRes.data || []).forEach(m => {
+      if (m.id_marca) marcasMap[String(m.id_marca)] = (m.nome_marca || '').trim();
+    });
+
+    // Descobre vínculo marca_id <-> modelo_id a partir dos equipamentos cadastrados caso a tabela modelos não tenha marca_id
+    const modeloToMarcaMap = {};
+    (equipRes.data || []).forEach(eq => {
+      if (eq.modelo_id && eq.marca_id && marcasMap[String(eq.marca_id)]) {
+        modeloToMarcaMap[String(eq.modelo_id)] = marcasMap[String(eq.marca_id)];
+      }
+    });
+
+    const modelosMap = new Map();
+
+    (modelosRes.data || []).forEach(mod => {
+      const nomeModelo = (mod.nome_modelo || '').trim();
+      if (!nomeModelo) return;
+
+      const marcaId = mod.marca_id ?? mod.id_marca;
+      const nomeMarca =
+        (marcaId ? marcasMap[String(marcaId)] : '') ||
+        modeloToMarcaMap[String(mod.id_modelo)] ||
+        detectBrand(nomeModelo) ||
+        '';
+
+      const fullLabel =
+        nomeMarca && !nomeModelo.toLowerCase().includes(nomeMarca.toLowerCase())
+          ? `${nomeMarca} ${nomeModelo}`
+          : nomeModelo;
+
+      const key = fullLabel.toUpperCase();
+      if (!modelosMap.has(key)) {
+        modelosMap.set(key, {
+          id: mod.id_modelo || key,
+          marca: nomeMarca || 'Outros',
+          modelo: nomeModelo,
+          label: fullLabel
+        });
+      }
+    });
+
+    const list = Array.from(modelosMap.values()).sort((a, b) => a.label.localeCompare(b.label));
+    if (list.length > 0) {
+      try {
+        localStorage.setItem(STORAGE_KEY_MODELOS, JSON.stringify(list));
+      } catch {
+        // Ignora erro de storage
+      }
+      return list;
+    }
+  } catch (err) {
+    console.warn('Erro ao carregar modelos de impressoras:', err);
+  }
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_MODELOS);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
 };
 
 export const getHistoricoMovimentacoes = async () => {
@@ -114,6 +193,39 @@ export const atualizarQuantidadePeca = async (pecaId, delta, motivo = 'Ajuste ma
   } catch (err) {
     console.warn('Erro ao atualizar produto no Supabase:', err);
     throw new Error('Não foi possível salvar o estoque no servidor: ' + (err.message || err));
+  }
+
+  return pecas[index];
+};
+
+export const atualizarCompatibilidadePeca = async (pecaId, novaCompatibilidade) => {
+  const pecas = await getEstoqueVolante();
+  const index = pecas.findIndex(p => String(p.id) === String(pecaId) || p.codigo === pecaId);
+  if (index === -1) throw new Error('Peça/Produto não encontrado no estoque.');
+
+  const compatFinal = (novaCompatibilidade || '').trim() || 'Multimarca';
+  const peca = pecas[index];
+  pecas[index] = { ...peca, compatibilidade: compatFinal };
+  salvarEstoqueCache(pecas);
+
+  try {
+    const isUuid = peca.id && !String(peca.id).startsWith('p-');
+    let query = supabase.from('produtos').update({
+      marca_modelo_compativel: compatFinal,
+      updated_at: new Date().toISOString()
+    });
+
+    if (isUuid) {
+      query = query.eq('id_produtos', peca.id);
+    } else {
+      query = query.eq('codigo_sku', peca.codigo);
+    }
+
+    const { error } = await query;
+    if (error) throw error;
+  } catch (err) {
+    console.warn('Erro ao atualizar compatibilidade no Supabase:', err);
+    throw new Error('Não foi possível salvar o vínculo de modelo no servidor: ' + (err.message || err));
   }
 
   return pecas[index];

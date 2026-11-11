@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Carrega variáveis com prefixo VITE_ exigido pelo Vite
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_KEY;
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_KEY || '').trim();
 
 // Verificação explícita de variáveis de ambiente
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {

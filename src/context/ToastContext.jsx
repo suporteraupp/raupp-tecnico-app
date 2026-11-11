@@ -22,6 +22,7 @@ export function ToastProvider({ children }) {
   );
 }
 
+// oxlint-disable-next-line react/only-export-components
 export function useToast() {
   const ctx = useContext(ToastContext);
   if (!ctx) {

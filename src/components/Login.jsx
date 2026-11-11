@@ -5,6 +5,7 @@ export function Login({ showToast }) {
   const { login, signUp } = useAuth();
   const [isRegistering, setIsRegistering] = useState(false);
   const [usuario, setUsuario] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -14,7 +15,7 @@ export function Login({ showToast }) {
     e.preventDefault();
     setAuthError('');
 
-    if (!usuario.trim() || !password.trim()) {
+    if ((!usuario.trim() && !email.trim()) || !password.trim()) {
       if (showToast) showToast('Preencha usuário/e-mail e senha.', 'warning');
       return;
     }
@@ -22,7 +23,7 @@ export function Login({ showToast }) {
     try {
       setLoading(true);
       if (isRegistering) {
-        const res = await signUp(usuario.trim(), password.trim());
+        const res = await signUp(usuario.trim(), password.trim(), email.trim());
         if (res.isNew) {
           if (showToast) showToast(`Conta criada com sucesso! Bem-vindo, ${res.user.nome}!`, 'success');
         } else {
@@ -118,9 +119,30 @@ export function Login({ showToast }) {
           </div>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {authError && (
+              <div
+                role="alert"
+                style={{
+                  background: 'rgba(239, 68, 68, 0.14)',
+                  border: '1px solid rgba(248, 113, 113, 0.4)',
+                  color: '#fca5a5',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  lineHeight: 1.35
+                }}
+              >
+                <i className="fa-solid fa-circle-exclamation" style={{ color: '#f87171', flexShrink: 0 }}></i>
+                <span>{authError}</span>
+              </div>
+            )}
+
             <div className="form-group-field">
               <label className="form-label-styled">
-                USUÁRIO OU E-MAIL <span style={{ color: 'var(--error)' }}>*</span>
+                {isRegistering ? 'USUÁRIO (LOGIN CURTO)' : 'USUÁRIO OU E-MAIL'} <span style={{ color: 'var(--error)' }}>*</span>
               </label>
               <div style={{ position: 'relative' }}>
                 <i className="fa-solid fa-user" style={{
@@ -133,9 +155,10 @@ export function Login({ showToast }) {
                 }}></i>
                 <input
                   type="text"
+                  autoComplete="username"
                   className="input-styled"
                   style={{ paddingLeft: '44px' }}
-                  placeholder="Seu usuário ou e-mail"
+                  placeholder={isRegistering ? 'Ex: kayke ou carlos.silva' : 'Digite seu usuário ou seu e-mail'}
                   value={usuario}
                   onChange={(e) => {
                     setUsuario(e.target.value);
@@ -144,6 +167,36 @@ export function Login({ showToast }) {
                 />
               </div>
             </div>
+
+            {isRegistering && (
+              <div className="form-group-field">
+                <label className="form-label-styled">
+                  E-MAIL <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 400 }}>(OPCIONAL)</span>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <i className="fa-solid fa-envelope" style={{
+                    position: 'absolute',
+                    left: '16px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--text-secondary)',
+                    fontSize: '1rem'
+                  }}></i>
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    className="input-styled"
+                    style={{ paddingLeft: '44px' }}
+                    placeholder="seuemail@dominio.com (ou deixe em branco)"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (authError) setAuthError('');
+                    }}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="form-group-field">
               <label className="form-label-styled">

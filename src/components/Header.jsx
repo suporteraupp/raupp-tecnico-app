@@ -1,12 +1,6 @@
 import React from 'react';
-import { removeToken } from '../services/supabase/client';
 
 export function Header({ user, onRefresh, onLogout }) {
-  const handleLogout = () => {
-    removeToken();
-    onLogout();
-  };
-
   return (
     <header className="app-header">
       <div className="header-title-area">
@@ -37,7 +31,7 @@ export function Header({ user, onRefresh, onLogout }) {
         </button>
 
         <button
-          onClick={handleLogout}
+          onClick={onLogout}
           className="btn-mobile"
           style={{
             padding: '9px 13px',

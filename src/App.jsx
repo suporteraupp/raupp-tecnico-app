@@ -31,6 +31,7 @@ function TechnicalApp() {
     loadData,
     startOs,
     completeOs,
+    reopenOs,
     getFilteredData
   } = useChamados({ showToast, updateMaletaMetrics });
 
@@ -55,7 +56,14 @@ function TechnicalApp() {
     if (!activeOsForSignature) return;
     await completeOs(activeOsForSignature.id_os_chamados, payload);
     setActiveOsForSignature(null);
-    setCurrentTab('concluido');
+    setCurrentTab(payload.preventivaInfo ? 'aberto' : 'concluido');
+  };
+
+  const handleReopenOs = async (os) => {
+    const ok = await reopenOs(os);
+    if (ok) {
+      setCurrentTab('aberto');
+    }
   };
 
   const handleLogout = () => {
@@ -107,7 +115,7 @@ function TechnicalApp() {
 
       <main style={{ minHeight: '300px', position: 'relative', zIndex: 10 }}>
         {currentTab === 'maleta' ? (
-          <TechMaleta showToast={showToast} />
+          <TechMaleta showToast={showToast} onEstoqueChange={updateMaletaMetrics} />
         ) : currentTab === 'clientes' ? (
           <ClientList parceiros={parceiros} loading={loadingParceiros} selectedCity={selectedCity} />
         ) : dataLoading ? (
@@ -134,6 +142,7 @@ function TechnicalApp() {
                 onStartOs={handleStartOs}
                 onOpenSignatureModal={setActiveOsForSignature}
                 onOpenHistory={handleOpenHistory}
+                onReopenOs={handleReopenOs}
               />
             ))}
           </div>

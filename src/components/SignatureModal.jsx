@@ -1,5 +1,30 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { getEstoqueVolante, darBaixaPecasOS } from '../services/supabase/produtosService';
+import { salvarAlertaPreventivoLocal } from '../services/supabase/chamadosService';
+import { extractPrinterInfo, classifyPecaCompatibility } from '../domain/equipamentos/brandDetector';
+
+const CHECKLIST_ETAPAS = [
+  {
+    id: 'limpeza',
+    label: 'Limpeza interna e externa (óptica, vidro do scanner e tracionadores/roletes)'
+  },
+  {
+    id: 'desgaste',
+    label: 'Verificação de desgaste de peças (fusor, cilindro, unidade de imagem e pickup roller)'
+  },
+  {
+    id: 'teste',
+    label: 'Impressão de página de teste / relatório de configuração e verificação de qualidade'
+  }
+];
+
+const PECAS_DESGASTE_COMUNS = [
+  'Fusor / Unidade Fusora',
+  'Cilindro / Drum',
+  'Roletes / Pickup Roller',
+  'Unidade de Imagem',
+  'Belt / Correia de Transferência'
+];
 
 export function SignatureModal({ os, onClose, onSubmit, showToast }) {
   const canvasRef = useRef(null);
@@ -9,12 +34,42 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checklist, setChecklist] = useState({
+    limpeza: false,
+    desgaste: false,
+    teste: false
+  });
+
+  const totalChecklist = CHECKLIST_ETAPAS.length;
+  const concluidosChecklist = CHECKLIST_ETAPAS.filter(etapa => checklist[etapa.id]).length;
+  const checklistCompleto = concluidosChecklist === totalChecklist;
+
+  const toggleChecklistItem = (id) => {
+    setChecklist(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  // Estados para Alerta Preventivo (Peça no Fim da Vida Útil)
+  const [temAlertaPreventivo, setTemAlertaPreventivo] = useState(false);
+  const [pecaFimVida, setPecaFimVida] = useState('');
+  const [obsFimVida, setObsFimVida] = useState('');
+  const [gerarOsPreventiva, setGerarOsPreventiva] = useState(true);
 
   // Estados para Peças da Maleta
   const [estoqueVolante, setEstoqueVolante] = useState([]);
   const [selectedPecaId, setSelectedPecaId] = useState('');
   const [qtdPecaUsada, setQtdPecaUsada] = useState('1');
   const [pecasUtilizadas, setPecasUtilizadas] = useState([]);
+
+  const equip = os?.equipamento || {};
+  const { detectedBrand, fullPrinterName, numSerie } = extractPrinterInfo(equip, os);
+
+  // Filtra estritamente apenas peças e insumos compatíveis com a Marca / Modelo deste equipamento
+  const pecasCompativeis = estoqueVolante
+    .map(p => ({
+      ...p,
+      nivelCompat: classifyPecaCompatibility(p, equip, os)
+    }))
+    .filter(p => p.nivelCompat === 'modelo' || p.nivelCompat === 'marca');
 
   useEffect(() => {
     // Carrega peças disponíveis na maleta do técnico
@@ -77,6 +132,8 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
   };
 
   const hasSignatureRef = useRef(false);
+  const lastPosRef = useRef(null);
+  const strokeDistanceRef = useRef(0);
   useEffect(() => { hasSignatureRef.current = hasSignature; }, [hasSignature]);
 
   const resizeCanvas = useCallback(() => {
@@ -154,6 +211,7 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const pos = getPos(e);
+    lastPosRef.current = pos;
     ctx.beginPath();
     ctx.moveTo(pos.x, pos.y);
   };
@@ -161,18 +219,27 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
   const handleMove = (e) => {
     if (!isDrawing) return;
     e.preventDefault();
-    if (!hasSignature) {
-      setHasSignature(true);
-    }
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const pos = getPos(e);
+
+    if (lastPosRef.current) {
+      const dx = pos.x - lastPosRef.current.x;
+      const dy = pos.y - lastPosRef.current.y;
+      strokeDistanceRef.current += Math.hypot(dx, dy);
+      if (strokeDistanceRef.current >= 15 && !hasSignature) {
+        setHasSignature(true);
+      }
+    }
+    lastPosRef.current = pos;
+
     ctx.lineTo(pos.x, pos.y);
     ctx.stroke();
   };
 
   const handleEnd = () => {
     setIsDrawing(false);
+    lastPosRef.current = null;
   };
 
   const clearCanvas = () => {
@@ -181,11 +248,21 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    strokeDistanceRef.current = 0;
+    lastPosRef.current = null;
     setHasSignature(false);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!checklistCompleto) {
+      showToast('Por favor, conclua todas as etapas obrigatórias do Checklist Técnico.', 'warning');
+      return;
+    }
+    if (temAlertaPreventivo && !pecaFimVida.trim()) {
+      showToast('Informe qual peça está no fim da vida útil (ex: Fusor, Cilindro).', 'warning');
+      return;
+    }
     if (!laudo.trim()) {
       showToast('Por favor, descreva o laudo técnico do atendimento.', 'warning');
       return;
@@ -201,6 +278,39 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
     try {
       setLoading(true);
 
+      const resumoChecklistText =
+        '\n--- CHECKLIST TÉCNICO EXECUTADO ---\n' +
+        CHECKLIST_ETAPAS.map(etapa => `[✓] ${etapa.label}`).join('\n');
+
+      let resumoAlertaPreventivoText = '';
+      let textoAlertaCurto = '';
+      if (temAlertaPreventivo && pecaFimVida.trim()) {
+        const detalhe = obsFimVida.trim() || 'Vai durar apenas mais algumas impressões — levar peça na próxima visita.';
+        textoAlertaCurto = `${pecaFimVida.trim()} (${fullPrinterName}) — ${detalhe}`;
+        resumoAlertaPreventivoText =
+          `\n--- ALERTA PREVENTIVO (PEÇA NO FIM DA VIDA ÚTIL) ---\n` +
+          `⚠️ ${textoAlertaCurto}`;
+      }
+
+      // Formata contadores P&B e Color no laudo quando informados
+      const pbVal = contadorPb !== '' ? parseInt(contadorPb, 10) : undefined;
+      const corVal = contadorCor !== '' ? parseInt(contadorCor, 10) : undefined;
+      if ((pbVal !== undefined && pbVal < 0) || (corVal !== undefined && corVal < 0)) {
+        showToast('Os contadores não podem ter valores negativos.', 'warning');
+        setLoading(false);
+        return;
+      }
+
+      let resumoContadoresText = '';
+      if (pbVal !== undefined || corVal !== undefined) {
+        const linhasContadores = [];
+        if (pbVal !== undefined && !Number.isNaN(pbVal)) linhasContadores.push(`- P&B: ${pbVal.toLocaleString('pt-BR')} páginas`);
+        if (corVal !== undefined && !Number.isNaN(corVal)) linhasContadores.push(`- Color: ${corVal.toLocaleString('pt-BR')} páginas`);
+        if (linhasContadores.length > 0) {
+          resumoContadoresText = '\n--- MEDIDORES NO ATENDIMENTO ---\n' + linhasContadores.join('\n');
+        }
+      }
+
       // Formata lista de peças no laudo técnico
       let resumoPecasText = '';
       if (pecasUtilizadas.length > 0) {
@@ -213,14 +323,28 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
         .replace(/---ASSINATURA---/g, '[ASSINATURA]')
         .replace(/\[Assinatura Digital\]:/g, '[Assinatura Digital]');
 
-      const laudoCompleto = `${laudoSanitizado}${resumoPecasText}\n---ASSINATURA---\n${signatureBase64}`;
+      const laudoCompleto = `${laudoSanitizado}${resumoChecklistText}${resumoAlertaPreventivoText}${resumoContadoresText}${resumoPecasText}\n---ASSINATURA---\n${signatureBase64}`;
 
-      // 1º conclui a OS; só depois dá baixa no estoque (evita baixa sem OS concluída / baixa duplicada)
+      if (textoAlertaCurto) {
+        const eqId = os.equipamentos_id ?? equip?.id_equipamentos;
+        salvarAlertaPreventivoLocal(eqId, numSerie, textoAlertaCurto);
+      }
+
+      const preventivaInfo = temAlertaPreventivo && gerarOsPreventiva && pecaFimVida.trim()
+        ? {
+            osOriginal: os,
+            pecaAlerta: `${pecaFimVida.trim()} (${fullPrinterName})`,
+            detalheAlerta: obsFimVida.trim() || 'Vai durar apenas mais algumas impressões — levar peça no carro.'
+          }
+        : null;
+
+      // 1º conclui a OS (e cria/reabre a preventiva se marcado); só depois dá baixa no estoque
       await onSubmit({
         status_chamado: 'concluido',
         laudo_tecnico: laudoCompleto,
-        contador_pb_atendimento: contadorPb ? parseInt(contadorPb) : undefined,
-        contador_cor_atendimento: contadorCor ? parseInt(contadorCor) : undefined
+        contador_pb_atendimento: pbVal !== undefined && !Number.isNaN(pbVal) ? pbVal : undefined,
+        contador_cor_atendimento: corVal !== undefined && !Number.isNaN(corVal) ? corVal : undefined,
+        preventivaInfo
       });
 
       if (pecasUtilizadas.length > 0) {
@@ -250,6 +374,216 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
         </div>
 
         <form onSubmit={handleSubmit}>
+          {/* Checklist Obrigatório de Procedimentos do Técnico */}
+          <div
+            className="form-group-field"
+            style={{
+              background: checklistCompleto ? 'rgba(16, 185, 129, 0.06)' : 'rgba(255, 255, 255, 0.03)',
+              padding: '12px',
+              borderRadius: '12px',
+              border: `1px solid ${checklistCompleto ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', gap: '8px', flexWrap: 'wrap' }}>
+              <label className="form-label-styled" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                <i className="fa-solid fa-list-check" style={{ color: checklistCompleto ? '#34d399' : '#38bdf8' }}></i>
+                Checklist de Procedimentos *
+              </label>
+
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  padding: '2px 9px',
+                  borderRadius: '12px',
+                  background: checklistCompleto ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.18)',
+                  color: checklistCompleto ? '#34d399' : '#fbbf24',
+                  border: `1px solid ${checklistCompleto ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}`
+                }}
+              >
+                {checklistCompleto ? '✅ Completo' : `${concluidosChecklist}/${totalChecklist} etapas`}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {CHECKLIST_ETAPAS.map((etapa, idx) => {
+                const checked = !!checklist[etapa.id];
+                return (
+                  <div
+                    key={etapa.id}
+                    onClick={() => toggleChecklistItem(etapa.id)}
+                    role="checkbox"
+                    aria-checked={checked}
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === ' ' || e.key === 'Enter') {
+                        e.preventDefault();
+                        toggleChecklistItem(etapa.id);
+                      }
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                      background: checked ? 'rgba(16, 185, 129, 0.14)' : 'rgba(7, 9, 14, 0.65)',
+                      border: `1px solid ${checked ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <i
+                      className={checked ? 'fa-solid fa-square-check' : 'fa-regular fa-square'}
+                      style={{
+                        fontSize: '1.15rem',
+                        color: checked ? '#34d399' : '#64748b',
+                        flexShrink: 0
+                      }}
+                    ></i>
+                    <span
+                      style={{
+                        fontSize: '0.82rem',
+                        lineHeight: 1.35,
+                        color: checked ? '#f8fafc' : '#cbd5e1',
+                        fontWeight: checked ? 600 : 400
+                      }}
+                    >
+                      <strong style={{ color: checked ? '#34d399' : '#38bdf8', marginRight: '4px' }}>
+                        {idx + 1}.
+                      </strong>
+                      {etapa.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Alerta Preventivo: Peça no Fim da Vida Útil (Vai durar poucas impressões) */}
+          <div
+            className="form-group-field"
+            style={{
+              background: temAlertaPreventivo ? 'rgba(245, 158, 11, 0.1)' : 'rgba(255, 255, 255, 0.03)',
+              padding: '12px',
+              borderRadius: '12px',
+              border: `1px solid ${temAlertaPreventivo ? 'rgba(245, 158, 11, 0.45)' : 'rgba(255, 255, 255, 0.08)'}`,
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <div
+              onClick={() => setTemAlertaPreventivo(!temAlertaPreventivo)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                cursor: 'pointer',
+                userSelect: 'none'
+              }}
+            >
+              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: temAlertaPreventivo ? '#fbbf24' : '#cbd5e1', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <i className="fa-solid fa-triangle-exclamation" style={{ color: '#f59e0b' }}></i>
+                Constatou peça gasta (vai durar só mais algumas impressões)?
+              </span>
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  padding: '3px 10px',
+                  borderRadius: '12px',
+                  background: temAlertaPreventivo ? '#f59e0b' : 'rgba(255, 255, 255, 0.08)',
+                  color: temAlertaPreventivo ? '#0f172a' : '#94a3b8'
+                }}
+              >
+                {temAlertaPreventivo ? 'SIM (Ativo)' : 'NÃO'}
+              </span>
+            </div>
+
+            {temAlertaPreventivo && (
+              <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed rgba(245, 158, 11, 0.3)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div>
+                  <label className="form-label-styled" style={{ fontSize: '0.74rem', color: '#fcd34d' }}>
+                    Qual peça está no limite da vida útil? *
+                  </label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                    {PECAS_DESGASTE_COMUNS.map(itemNome => {
+                      const selecionado = pecaFimVida === itemNome;
+                      return (
+                        <button
+                          key={itemNome}
+                          type="button"
+                          onClick={() => setPecaFimVida(itemNome)}
+                          style={{
+                            padding: '5px 10px',
+                            borderRadius: '14px',
+                            fontSize: '0.74rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            border: selecionado ? '1px solid #fbbf24' : '1px solid rgba(255, 255, 255, 0.14)',
+                            background: selecionado ? 'rgba(245, 158, 11, 0.28)' : 'rgba(15, 23, 42, 0.7)',
+                            color: selecionado ? '#fef08a' : '#cbd5e1'
+                          }}
+                        >
+                          {selecionado ? '⚠️ ' : ''}{itemNome}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <input
+                    type="text"
+                    className="input-styled"
+                    style={{ fontSize: '0.82rem' }}
+                    placeholder="Ou digite a peça (ex: Fusor Brother HL-L5102DW)..."
+                    value={pecaFimVida}
+                    onChange={(e) => setPecaFimVida(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label-styled" style={{ fontSize: '0.74rem', color: '#fcd34d' }}>
+                    Estimativa / Aviso para o Próximo Atendimento
+                  </label>
+                  <input
+                    type="text"
+                    className="input-styled"
+                    style={{ fontSize: '0.82rem' }}
+                    placeholder="Ex: Vai durar só mais ~1.000 impressões. Levar fusor na próxima visita!"
+                    value={obsFimVida}
+                    onChange={(e) => setObsFimVida(e.target.value)}
+                  />
+                </div>
+
+                <div
+                  onClick={() => setGerarOsPreventiva(!gerarOsPreventiva)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    background: 'rgba(7, 9, 14, 0.6)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    fontSize: '0.78rem',
+                    color: '#fef3c7'
+                  }}
+                >
+                  <i
+                    className={gerarOsPreventiva ? 'fa-solid fa-square-check' : 'fa-regular fa-square'}
+                    style={{ color: gerarOsPreventiva ? '#fbbf24' : '#64748b', fontSize: '1.05rem' }}
+                  ></i>
+                  <span>
+                    <strong>Abrir automaticamente uma OS Preventiva</strong> no sistema para lembrar de levar esta peça na próxima visita
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="form-group-field">
             <label className="form-label-styled">Laudo Técnico / Solução Aplicada *</label>
             <textarea
@@ -262,12 +596,37 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
             ></textarea>
           </div>
 
-          {/* Seção de Peças & Consumíveis do Estoque Volante */}
+          {/* Seção de Peças & Consumíveis do Estoque Volante (Restrito à Marca/Modelo da OS) */}
           <div className="form-group-field" style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-            <label className="form-label-styled" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <label className="form-label-styled" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
               <i className="fa-solid fa-briefcase" style={{ color: '#00a2e8' }}></i>
-              Peças Utilizadas (Estoque Volante do Carro)
+              Peças e Insumos Compatíveis ({fullPrinterName})
             </label>
+
+            {/* Banner informativo do Modelo da Impressora vinculada à OS */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '8px',
+              flexWrap: 'wrap',
+              background: 'rgba(56, 189, 248, 0.08)',
+              border: '1px solid rgba(56, 189, 248, 0.2)',
+              padding: '6px 10px',
+              borderRadius: '8px',
+              marginBottom: '10px',
+              fontSize: '0.76rem'
+            }}>
+              <span style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <i className="fa-solid fa-print" style={{ color: '#38bdf8' }}></i>
+                Equipamento: <strong style={{ color: '#f8fafc' }}>{fullPrinterName}</strong>
+              </span>
+              <span style={{ color: pecasCompativeis.length > 0 ? '#34d399' : '#f87171', fontWeight: 600, fontSize: '0.72rem' }}>
+                {pecasCompativeis.length > 0
+                  ? `✅ ${pecasCompativeis.length} peça(s) compatível(is)`
+                  : '⚠️ Nenhuma peça para este modelo na maleta'}
+              </span>
+            </div>
 
             <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
               <select
@@ -275,11 +634,16 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
                 style={{ flex: '3 1 180px', fontSize: '0.8rem' }}
                 value={selectedPecaId}
                 onChange={(e) => setSelectedPecaId(e.target.value)}
+                disabled={pecasCompativeis.length === 0}
               >
-                <option value="">-- Selecionar Peça da Maleta --</option>
-                {estoqueVolante.map(p => (
+                <option value="">
+                  {pecasCompativeis.length > 0
+                    ? `-- Selecionar peça para ${fullPrinterName || detectedBrand} --`
+                    : `-- Sem peças para ${fullPrinterName || detectedBrand} no estoque --`}
+                </option>
+                {pecasCompativeis.map(p => (
                   <option key={p.id} value={p.id}>
-                    {p.nome} (Disp: {p.quantidade} {p.unidade})
+                    {p.nome} [{p.compatibilidade}] (Disp: {p.quantidade} {p.unidade})
                   </option>
                 ))}
               </select>
@@ -344,6 +708,9 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
               <label className="form-label-styled">Contador P&B Atual</label>
               <input
                 type="number"
+                inputMode="numeric"
+                min="0"
+                step="1"
                 className="input-styled"
                 placeholder="Ex: 15420"
                 value={contadorPb}
@@ -354,6 +721,9 @@ export function SignatureModal({ os, onClose, onSubmit, showToast }) {
               <label className="form-label-styled">Contador Color Atual</label>
               <input
                 type="number"
+                inputMode="numeric"
+                min="0"
+                step="1"
                 className="input-styled"
                 placeholder="Ex: 3200"
                 value={contadorCor}

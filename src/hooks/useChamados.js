@@ -1,7 +1,12 @@
 import { useState, useCallback } from 'react';
-import { apiFetchChamados, apiAtualizarStatusChamado } from '../services/supabase/chamadosService';
+import {
+  apiFetchChamados,
+  apiAtualizarStatusChamado,
+  apiCriarChamadoPreventivo,
+  apiReabrirChamado
+} from '../services/supabase/chamadosService';
 import { apiFetchParceiros } from '../services/supabase/parceirosService';
-import { matchesStatus } from '../domain/chamados/statusRules';
+import { matchesStatus, sortChamadosByTab } from '../domain/chamados/statusRules';
 import { buildAvailableCities, getCityString, extractPartnerCities } from '../domain/parceiros/cityExtractor';
 
 export function useChamados({ showToast, updateMaletaMetrics }) {
@@ -49,7 +54,17 @@ export function useChamados({ showToast, updateMaletaMetrics }) {
   const completeOs = useCallback(async (osId, payload) => {
     try {
       await apiAtualizarStatusChamado(osId, payload);
-      if (showToast) showToast('Ordem de Serviço concluída com Assinatura Digital e Baixa de Peças!', 'success');
+
+      if (payload.preventivaInfo) {
+        const { osOriginal, pecaAlerta, detalheAlerta } = payload.preventivaInfo;
+        await apiCriarChamadoPreventivo(osOriginal, pecaAlerta, detalheAlerta, payload.laudo_tecnico);
+        if (showToast) {
+          showToast('OS registrada e chamado reaberto na fila de Abertos com alerta para levar a peça!', 'success');
+        }
+      } else if (showToast) {
+        showToast('Ordem de Serviço concluída com Assinatura Digital e Baixa de Peças!', 'success');
+      }
+
       await loadData();
       if (updateMaletaMetrics) await updateMaletaMetrics();
       return true;
@@ -58,6 +73,20 @@ export function useChamados({ showToast, updateMaletaMetrics }) {
       throw err;
     }
   }, [loadData, showToast, updateMaletaMetrics]);
+
+  const reopenOs = useCallback(async (os) => {
+    try {
+      await apiReabrirChamado(os);
+      if (showToast) {
+        showToast('Chamado reaberto com sucesso na aba Abertos (com histórico e alerta preservados)!', 'success');
+      }
+      await loadData();
+      return true;
+    } catch (err) {
+      if (showToast) showToast(err.message || 'Erro ao reabrir chamado.', 'error');
+      return false;
+    }
+  }, [loadData, showToast]);
 
   const getFilteredData = (currentTab, selectedCity) => {
     const availableCities = buildAvailableCities(parceiros, chamados, currentTab, matchesStatus);
@@ -74,7 +103,10 @@ export function useChamados({ showToast, updateMaletaMetrics }) {
     const abertos = filteredByCityChamados.filter(c => matchesStatus(c.status_chamado, 'aberto'));
     const emCurso = filteredByCityChamados.filter(c => matchesStatus(c.status_chamado, 'em_atendimento'));
     const concluidos = filteredByCityChamados.filter(c => matchesStatus(c.status_chamado, 'concluido'));
-    const filteredList = filteredByCityChamados.filter(c => matchesStatus(c.status_chamado, currentTab));
+    const filteredList = sortChamadosByTab(
+      filteredByCityChamados.filter(c => matchesStatus(c.status_chamado, currentTab)),
+      currentTab
+    );
 
     const filteredByCityParceiros = selectedCity
       ? parceiros.filter(p => {
@@ -104,6 +136,7 @@ export function useChamados({ showToast, updateMaletaMetrics }) {
     loadData,
     startOs,
     completeOs,
+    reopenOs,
     getFilteredData
   };
 }

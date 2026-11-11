@@ -41,8 +41,8 @@ export function AuthProvider({ children }) {
     return res;
   }, []);
 
-  const signUp = useCallback(async (usuario, password) => {
-    const res = await apiSignUp(usuario, password);
+  const signUp = useCallback(async (usuario, password, email = '') => {
+    const res = await apiSignUp(usuario, password, email);
     if (res.isNew) {
       setUser(res.user);
     }
@@ -61,6 +61,7 @@ export function AuthProvider({ children }) {
   );
 }
 
+// oxlint-disable-next-line react/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) {

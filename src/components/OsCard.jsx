@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { extractPrinterInfo } from '../domain/equipamentos/brandDetector';
 
-export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpenHistory }) {
+export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpenHistory, onReopenOs }) {
   const [expanded, setExpanded] = useState(currentTab === 'em_atendimento');
 
   const parceiro = os.parceiro || {};
@@ -14,10 +14,10 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
   const numOsFormatted = os.numero_os ? `OS #${os.numero_os}` : `OS #${String(os.id_os_chamados || '').substring(0, 8).toUpperCase()}`;
 
 
-  // Telefone / Contatos
-  const foneCliente = os.solicitante_telefone || loc.contato1_fone || parceiro.contato1_fone || parceiro.doc_principal || '';
+  // Telefone / Contatos (nunca usar doc_principal/CNPJ como telefone)
+  const foneCliente = os.solicitante_telefone || loc.contato1_fone || parceiro.contato1_fone || '';
   const foneClean = foneCliente.replace(/\D/g, '');
-  const hasPhone = foneClean.length >= 8;
+  const hasPhone = foneClean.length >= 8 && foneClean.length <= 13;
   const waNumber = foneClean.startsWith('55') && foneClean.length >= 12 ? foneClean : `55${foneClean}`;
 
   // Endereço Completo real
@@ -177,6 +177,31 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
         <strong style={{ color: '#60a5fa' }}>Problema:</strong> {os.descricao_problema}
       </div>
 
+      {/* Alerta Preventivo da Última Visita (Peça no Fim da Vida Útil) */}
+      {os.alerta_preventivo && (
+        <div
+          style={{
+            background: 'rgba(245, 158, 11, 0.14)',
+            border: '1px solid rgba(245, 158, 11, 0.45)',
+            borderLeft: '4px solid #f59e0b',
+            borderRadius: '10px',
+            padding: '8px 11px',
+            marginBottom: '10px',
+            fontSize: '0.78rem',
+            lineHeight: 1.35,
+            color: '#fef3c7'
+          }}
+        >
+          <strong style={{ color: '#fbbf24', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', marginBottom: '2px' }}>
+            <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: '5px' }}></i>
+            {currentTab === 'concluido'
+              ? 'Alerta Preventivo Registrado (Peça no Fim da Vida Útil):'
+              : 'Aviso da Última Visita (Levar Peça):'}
+          </strong>
+          <span>{os.alerta_preventivo}</span>
+        </div>
+      )}
+
       {/* Ações diretas rápidas de fluxo */}
       {!expanded && (
         <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
@@ -189,6 +214,22 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
           {currentTab === 'em_atendimento' && (
             <button className="btn-mobile btn-complete" onClick={() => onOpenSignatureModal(os)} style={{ padding: '9px 14px', fontSize: '0.86rem' }}>
               <i className="fa-solid fa-signature"></i> Concluir & Coletar Assinatura
+            </button>
+          )}
+
+          {currentTab === 'concluido' && onReopenOs && (
+            <button
+              className="btn-mobile"
+              onClick={() => onReopenOs(os)}
+              style={{
+                padding: '9px 14px',
+                fontSize: '0.84rem',
+                background: 'rgba(245, 158, 11, 0.16)',
+                border: '1px solid rgba(245, 158, 11, 0.45)',
+                color: '#fbbf24'
+              }}
+            >
+              <i className="fa-solid fa-rotate-left"></i> Reabrir Chamado (Gerar Retorno)
             </button>
           )}
         </div>
@@ -211,8 +252,9 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                   {detectedBrand && (
                     <span style={{
-                      background: 'linear-gradient(135deg, #00a2e8, #0284c7)',
-                      color: '#ffffff',
+                      background: brandStyle.bg,
+                      color: brandStyle.color,
+                      boxShadow: `0 2px 8px ${brandStyle.shadow}`,
                       padding: '2px 8px',
                       borderRadius: '6px',
                       fontSize: '0.72rem',
@@ -262,10 +304,16 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
 
 
           {os.solicitante_nome && (
-
             <div className="card-detail-row">
               <i className="fa-solid fa-user"></i>
               <span>Solicitante: <strong style={{ color: '#fff' }}>{os.solicitante_nome}</strong> {foneCliente ? `(${foneCliente})` : ''}</span>
+            </div>
+          )}
+
+          {os.medidor_atendimento != null && (
+            <div className="card-detail-row">
+              <i className="fa-solid fa-gauge-high"></i>
+              <span>Contador Registrado: <strong style={{ color: '#fff' }}>{Number(os.medidor_atendimento).toLocaleString('pt-BR')}</strong> páginas</span>
             </div>
           )}
 
@@ -315,6 +363,20 @@ export function OsCard({ os, currentTab, onStartOs, onOpenSignatureModal, onOpen
             {currentTab === 'em_atendimento' && (
               <button className="btn-mobile btn-complete" onClick={() => onOpenSignatureModal(os)}>
                 <i className="fa-solid fa-signature"></i> Concluir & Coletar Assinatura
+              </button>
+            )}
+
+            {currentTab === 'concluido' && onReopenOs && (
+              <button
+                className="btn-mobile"
+                onClick={() => onReopenOs(os)}
+                style={{
+                  background: 'rgba(245, 158, 11, 0.16)',
+                  border: '1px solid rgba(245, 158, 11, 0.45)',
+                  color: '#fbbf24'
+                }}
+              >
+                <i className="fa-solid fa-rotate-left"></i> Reabrir Chamado (Gerar Retorno)
               </button>
             )}
           </div>
